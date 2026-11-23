@@ -22,6 +22,9 @@ public sealed record UpdateInfo(
     DateTimeOffset? Published,
     IReadOnlyList<UpdateAsset> Assets)
 {
+    /// <summary>"1.5.0" rather than "1.5.0.0".</summary>
+    public string Display => Version.Revision > 0 ? Version.ToString(4) : Version.ToString(3);
+
     /// <summary>The Windows installer attached to the release, if there is one.</summary>
     public UpdateAsset? Installer =>
         Assets.FirstOrDefault(a => a.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase));
@@ -72,7 +75,7 @@ public static class UpdateChecker
 
             return info is null
                 ? new UpdateResult(UpdateStatus.UpToDate, null, $"This is the latest version ({current}).")
-                : new UpdateResult(UpdateStatus.Available, info, $"Version {info.Version} is available.");
+                : new UpdateResult(UpdateStatus.Available, info, $"Version {info.Display} is available.");
         }
         catch (OperationCanceledException)
         {

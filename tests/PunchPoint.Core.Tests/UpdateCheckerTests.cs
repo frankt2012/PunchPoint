@@ -51,6 +51,7 @@ public class UpdateCheckerTests
 
         Assert.NotNull(info);
         Assert.Equal(new Version(1, 5, 0, 0), info!.Version);
+        Assert.Equal("1.5.0", info.Display);
         Assert.Equal("v1.5.0", info.Tag);
         Assert.Contains("check for updates", info.Notes);
         Assert.Equal("https://github.com/frankt2012/PunchPoint/releases/tag/v1.5.0", info.ReleaseUrl);

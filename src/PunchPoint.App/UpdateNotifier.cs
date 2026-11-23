@@ -51,7 +51,7 @@ internal static class UpdateNotifier
                     MarkChecked(store);
 
                     if (!result.HasUpdate || result.Update is null) return;
-                    if (string.Equals(result.Update.Version.ToString(), settings.Skipped, StringComparison.Ordinal))
+                    if (string.Equals(result.Update.Display, settings.Skipped, StringComparison.Ordinal))
                         return;
 
                     Show(owner, store, result.Update, current);
@@ -96,7 +96,7 @@ internal static class UpdateNotifier
         try
         {
             var settings = store.GetSettings();
-            settings.SkippedUpdateVersion = update.Version.ToString();
+            settings.SkippedUpdateVersion = update.Display;
             store.SaveSettings(settings);
         }
         catch

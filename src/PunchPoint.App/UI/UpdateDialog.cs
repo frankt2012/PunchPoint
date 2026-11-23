@@ -25,7 +25,7 @@ public sealed class UpdateDialog : Form
 
         var heading = new Label
         {
-            Text = $"Version {update.Version} is available",
+            Text = $"Version {update.Display} is available",
             Font = Theme.H2,
             ForeColor = Theme.Text,
             Dock = DockStyle.Top,
