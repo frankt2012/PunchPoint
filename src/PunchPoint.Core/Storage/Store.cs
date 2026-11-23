@@ -83,6 +83,11 @@ public sealed class Store
             ReportEmail = r.HasColumn("report_email") ? r.GetStringOrNull("report_email") ?? "" : "",
             EmailPeriodSummary = r.HasColumn("email_period") && r.GetBool("email_period"),
             EmailEmployees = r.HasColumn("email_employees") && r.GetBool("email_employees"),
+            EncryptSecrets = r.HasColumn("encrypt_secrets") && r.GetBool("encrypt_secrets"),
+            WebAccessEnabled = r.HasColumn("web_access") && r.GetBool("web_access"),
+            WebAccessPort = r.HasColumn("web_port") ? r.GetInt("web_port", 8080) : 8080,
+            WebAccessUser = r.HasColumn("web_user") ? r.GetStringOrNull("web_user") ?? "punchpoint" : "punchpoint",
+            WebAccessPassword = r.HasColumn("web_password") ? r.GetStringOrNull("web_password") ?? "" : "",
             LastBackupPath = r.GetStringOrNull("last_backup_path") ?? "",
         });
 
@@ -112,6 +117,9 @@ public sealed class Store
                 smtp_user = $smtpUser, smtp_password = $smtpPassword, smtp_from = $smtpFrom,
                 report_email = $reportEmail, email_period = $emailPeriod,
                 email_employees = $emailEmployees,
+                encrypt_secrets = $encryptSecrets,
+                web_access = $webAccess, web_port = $webPort,
+                web_user = $webUser, web_password = $webPassword,
                 last_backup_path = $backup
             WHERE id = 1;
             """,
@@ -137,6 +145,11 @@ public sealed class Store
             ("$smtpUser", s.SmtpUser), ("$smtpPassword", s.SmtpPassword), ("$smtpFrom", s.SmtpFrom),
             ("$reportEmail", s.ReportEmail), ("$emailPeriod", s.EmailPeriodSummary ? 1 : 0),
             ("$emailEmployees", s.EmailEmployees ? 1 : 0),
+            ("$encryptSecrets", s.EncryptSecrets ? 1 : 0),
+            ("$webAccess", s.WebAccessEnabled ? 1 : 0),
+            ("$webPort", s.WebAccessPort),
+            ("$webUser", s.WebAccessUser),
+            ("$webPassword", s.WebAccessPassword),
             ("$backup", s.LastBackupPath));
     }
 

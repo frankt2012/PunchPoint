@@ -4,7 +4,7 @@ namespace PunchPoint.Core.Storage;
 
 public static class Schema
 {
-    public const int CurrentVersion = 7;
+    public const int CurrentVersion = 8;
 
     public static void Ensure(Database db)
     {
@@ -105,6 +105,22 @@ public static class Schema
                 """);
 
             SetVersion(db, 7);
+        }
+
+        if (version < 8)
+        {
+            foreach (var sql in new[]
+                     {
+                         "ALTER TABLE settings ADD COLUMN encrypt_secrets INTEGER NOT NULL DEFAULT 0;",
+                         "ALTER TABLE settings ADD COLUMN web_access INTEGER NOT NULL DEFAULT 0;",
+                         "ALTER TABLE settings ADD COLUMN web_port INTEGER NOT NULL DEFAULT 8080;",
+                         "ALTER TABLE settings ADD COLUMN web_user TEXT NOT NULL DEFAULT 'punchpoint';",
+                         "ALTER TABLE settings ADD COLUMN web_password TEXT NOT NULL DEFAULT '';",
+                     })
+            {
+                try { db.Execute(sql); } catch { /* already present */ }
+            }
+            SetVersion(db, 8);
         }
     }
 

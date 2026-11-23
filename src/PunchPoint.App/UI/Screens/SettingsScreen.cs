@@ -1,5 +1,6 @@
 using PunchPoint.App.UI;
 using PunchPoint.Core.Email;
+using PunchPoint.Core.Security;
 using PunchPoint.Core.Models;
 using PunchPoint.Core.TimeCalc;
 
@@ -43,6 +44,12 @@ public sealed class SettingsScreen : ScreenBase
     private readonly CheckBox _emailPeriod = Theme.Check("Email a summary automatically when a pay period ends");
     private readonly CheckBox _emailEmployees = Theme.Check("Also email each employee their own time card (needs an email on the employee)");
     private readonly Label _emailStatus = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
+    private readonly CheckBox _encryptSecrets = Theme.Check("Encrypt stored passwords with Windows DPAPI (recommended)");
+    private readonly CheckBox _webEnabled = Theme.Check("Allow read-only web access on this PC");
+    private readonly NumericUpDown _webPort = Number(1, 65535, 0, 80);
+    private readonly TextBox _webUser = Theme.Input(180);
+    private readonly TextBox _webPassword = Theme.Input(220);
+    private readonly Label _webHint = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
     private readonly DataGridView _shifts = new();
     private readonly DataGridView _holidays = new();
     private readonly Label _dataLabel = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
@@ -63,6 +70,7 @@ public sealed class SettingsScreen : ScreenBase
         stack.Add(BuildShiftCard());
         stack.Add(BuildHolidayCard());
         stack.Add(BuildEmailCard());
+        stack.Add(BuildWebCard());
         stack.Add(BuildDataCard());
 
         _periodType.Items.AddRange(new object[] { "Weekly", "Bi-weekly", "Semi-monthly", "Monthly" });
@@ -285,6 +293,7 @@ public sealed class SettingsScreen : ScreenBase
         stack.Add(Row("Username", _smtpUser));
         _smtpPassword.UseSystemPasswordChar = true;
         stack.Add(Row("Password / app password", _smtpPassword));
+        stack.Add(Row("", _encryptSecrets));
         stack.Add(Row("Send from", _smtpFrom));
         stack.Add(Row("Send summaries to", _reportEmail));
 
@@ -330,12 +339,78 @@ public sealed class SettingsScreen : ScreenBase
         s.SmtpPort = (int)_smtpPort.Value;
         s.SmtpUseSsl = _smtpSsl.Checked;
         s.SmtpUser = _smtpUser.Text.Trim();
-        s.SmtpPassword = _smtpPassword.Text;
+        s.SmtpPassword = SecretProtector.Protect(_smtpPassword.Text, _encryptSecrets.Checked);
         s.SmtpFrom = _smtpFrom.Text.Trim();
         s.ReportEmail = _reportEmail.Text.Trim();
         s.EmailPeriodSummary = _emailPeriod.Checked;
         s.EmailEmployees = _emailEmployees.Checked;
+        s.EncryptSecrets = _encryptSecrets.Checked;
+        s.SmtpPassword = SecretProtector.Protect(_smtpPassword.Text, s.EncryptSecrets);
+
+        s.WebAccessEnabled = _webEnabled.Checked;
+        s.WebAccessPort = (int)_webPort.Value;
+        s.WebAccessUser = _webUser.Text.Trim();
+        s.WebAccessPassword = SecretProtector.Protect(_webPassword.Text, s.EncryptSecrets);
         return s;
+    }
+
+    private Panel BuildWebCard()
+    {
+        var card = Theme.Card();
+        var stack = new StackPanel(8);
+        stack.Add(SectionTitle("Check hours from another device"));
+
+        stack.Add(new Label
+        {
+            Text = "While the clock is running, PunchPoint can serve a read-only page on your shop network: " +
+                   "who is on the clock and this period's hours. Open it from a phone or another PC. " +
+                   "It cannot change anything.",
+            Font = Theme.Small,
+            ForeColor = Theme.TextMuted,
+            AutoSize = true,
+            MaximumSize = new Size(780, 0),
+        });
+
+        stack.Add(Row("", _webEnabled));
+        stack.Add(Row("Port", _webPort));
+        stack.Add(Row("Username", _webUser));
+        _webPassword.UseSystemPasswordChar = true;
+        stack.Add(Row("Password", _webPassword));
+
+        stack.Add(_webHint);
+        stack.Add(new Label
+        {
+            Text = "Traffic is plain HTTP on your local network, so use a long password and do not forward " +
+                   "the port to the internet. Windows may ask to allow PunchPoint through the firewall the first time.",
+            Font = Theme.Small,
+            ForeColor = Theme.TextMuted,
+            AutoSize = true,
+            MaximumSize = new Size(780, 0),
+        });
+
+        card.Controls.Add(stack);
+        return card;
+    }
+
+    private static string LocalAddresses(int port)
+    {
+        try
+        {
+            var addresses = System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
+                .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up)
+                .Where(n => n.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
+                .SelectMany(n => n.GetIPProperties().UnicastAddresses)
+                .Select(a => a.Address)
+                .Where(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                .Select(a => $"http://{a}:{port}")
+                .ToList();
+
+            return addresses.Count == 0 ? "" : string.Join("   ", addresses);
+        }
+        catch
+        {
+            return "";
+        }
     }
 
     private Panel BuildDataCard()
@@ -430,6 +505,15 @@ public sealed class SettingsScreen : ScreenBase
         _reportEmail.Text = s.ReportEmail;
         _emailPeriod.Checked = s.EmailPeriodSummary;
         _emailEmployees.Checked = s.EmailEmployees;
+        _encryptSecrets.Checked = s.EncryptSecrets;
+        _smtpPassword.Text = SecretProtector.Unprotect(s.SmtpPassword);
+
+        _webEnabled.Checked = s.WebAccessEnabled;
+        _webPort.Value = Math.Clamp(s.WebAccessPort, 1, 65535);
+        _webUser.Text = s.WebAccessUser;
+        _webPassword.Text = SecretProtector.Unprotect(s.WebAccessPassword);
+        string urls = LocalAddresses(s.WebAccessPort);
+        _webHint.Text = urls.Length > 0 ? "Open: " + urls : "";
         _appearance.SelectedIndex = (int)s.Theme;
         _passwordStatus.Text = string.IsNullOrWhiteSpace(s.AdminPasswordHash)
             ? "  not set — the admin app is currently unprotected"
@@ -592,11 +676,18 @@ public sealed class SettingsScreen : ScreenBase
         s.SmtpPort = (int)_smtpPort.Value;
         s.SmtpUseSsl = _smtpSsl.Checked;
         s.SmtpUser = _smtpUser.Text.Trim();
-        s.SmtpPassword = _smtpPassword.Text;
+        s.SmtpPassword = SecretProtector.Protect(_smtpPassword.Text, _encryptSecrets.Checked);
         s.SmtpFrom = _smtpFrom.Text.Trim();
         s.ReportEmail = _reportEmail.Text.Trim();
         s.EmailPeriodSummary = _emailPeriod.Checked;
         s.EmailEmployees = _emailEmployees.Checked;
+        s.EncryptSecrets = _encryptSecrets.Checked;
+        s.SmtpPassword = SecretProtector.Protect(_smtpPassword.Text, s.EncryptSecrets);
+
+        s.WebAccessEnabled = _webEnabled.Checked;
+        s.WebAccessPort = (int)_webPort.Value;
+        s.WebAccessUser = _webUser.Text.Trim();
+        s.WebAccessPassword = SecretProtector.Protect(_webPassword.Text, s.EncryptSecrets);
         s.ShowPunchCommentDialog = _punchComment.Checked;
         s.RequireApprovalBeforeExport = _requireApproval.Checked;
 

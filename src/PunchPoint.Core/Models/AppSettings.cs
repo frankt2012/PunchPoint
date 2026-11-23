@@ -97,6 +97,15 @@ public sealed class AppSettings
     /// <summary>Also email each employee their own time card (needs an address on the employee).</summary>
     public bool EmailEmployees { get; set; }
 
+    /// <summary>Encrypt stored passwords with Windows DPAPI (per Windows account).</summary>
+    public bool EncryptSecrets { get; set; }
+
+    /// <summary>Serve the read-only hours page on the local network (from the clock).</summary>
+    public bool WebAccessEnabled { get; set; }
+    public int WebAccessPort { get; set; } = 8080;
+    public string WebAccessUser { get; set; } = "punchpoint";
+    public string WebAccessPassword { get; set; } = "";
+
     public string LastBackupPath { get; set; } = "";
     public int SchemaVersion { get; set; } = 1;
 }

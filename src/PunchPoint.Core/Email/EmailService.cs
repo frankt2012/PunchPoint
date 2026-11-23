@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Mail;
 using PunchPoint.Core.Models;
+using PunchPoint.Core.Security;
 
 namespace PunchPoint.Core.Email;
 
@@ -56,7 +57,7 @@ public static class EmailService
         };
 
         if (!string.IsNullOrWhiteSpace(settings.SmtpUser))
-            client.Credentials = new NetworkCredential(settings.SmtpUser, settings.SmtpPassword);
+            client.Credentials = new NetworkCredential(settings.SmtpUser, SecretProtector.Unprotect(settings.SmtpPassword));
 
         client.Send(message);
     }

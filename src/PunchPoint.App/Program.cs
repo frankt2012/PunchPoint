@@ -5,7 +5,9 @@ using PunchPoint.App.UI.Screens;
 using PunchPoint.Core.Models;
 using PunchPoint.Core.Services;
 using PunchPoint.Core.Storage;
+using PunchPoint.Core.Security;
 using PunchPoint.Core.TimeCalc;
+using PunchPoint.Core.Web;
 
 namespace PunchPoint.App;
 
@@ -110,7 +112,23 @@ internal static class Program
                 }
             });
 
-            Application.Run(form);
+            WebReportServer? web = null;
+            if (settings.WebAccessEnabled)
+            {
+                web = new WebReportServer(database.Path, settings.WebAccessUser,
+                    SecretProtector.Unprotect(settings.WebAccessPassword), settings.WebAccessPort);
+                if (!web.Start()) web = null; // the clock is probably already serving it
+            }
+
+            try
+            {
+                Application.Run(form);
+            }
+            finally
+            {
+                web?.Dispose();
+            }
+
             database.Dispose();
         }
         catch (Exception ex)

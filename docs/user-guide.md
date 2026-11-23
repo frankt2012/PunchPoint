@@ -138,6 +138,8 @@ Settings → **Email reports**:
   password (Google: Account → Security → 2-Step Verification → App passwords).
 * **Send from** — the address the mail comes from (usually the same account).
 * **Send summaries to** — where the payroll summary should arrive.
+* Optionally tick **Encrypt stored passwords with Windows DPAPI** so the SMTP and web
+  passwords cannot be read from the database by another Windows account.
 * Tick **Email a summary automatically when a pay period ends**.
 * Optionally tick **Also email each employee their own time card** — this needs an email
   address on each employee (Employees → Edit → Email).
@@ -148,8 +150,24 @@ Once a period has ended, the next time the clock (or the admin app) is running, 
 emails one PDF with every employee's regular, overtime and holiday hours. Each period is only
 sent once — the send is recorded in the database.
 
-There is no web/remote access to the app itself: the email is the remote view. If you would
-rather have a read-only web page on your shop network, that can be added.
+### Checking hours from a phone
+
+Settings → **Check hours from another device**:
+
+* Tick **Allow read-only web access on this PC**.
+* Choose a port (8080 is fine), a username and a **long password**.
+* Save. The address is shown under the fields, e.g. `http://192.168.1.23:8080`.
+
+Open that address on a phone or another PC on the same network. It shows who is currently
+clocked in and every employee's hours for the current period. It is **read-only** — no
+buttons, no editing, and it asks for the username and password every time.
+
+Notes:
+* The **clock must be running** for the page to be available (it is served by the clock).
+* The page is plain HTTP on your local network, so keep the password long and do not forward
+  the port from your router.
+* Windows may ask to allow PunchPoint through the firewall the first time — allow it on
+  private networks only.
 
 ## Exports
 
