@@ -31,9 +31,12 @@ public sealed class MainForm : Form
         ("settings", "Settings", true),
     };
 
-    public MainForm(AppServices services, string? startScreen = null)
+    private readonly bool _checkForUpdates;
+
+    public MainForm(AppServices services, string? startScreen = null, bool checkForUpdates = true)
     {
         _services = services;
+        _checkForUpdates = checkForUpdates;
 
         Text = "PunchPoint — Time & Attendance";
         Theme.ApplyTitleBar(this);
@@ -258,6 +261,15 @@ public sealed class MainForm : Form
         {
             return null;
         }
+    }
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+
+        // Quiet daily version check; only says something when a newer release exists.
+        if (_checkForUpdates)
+            UpdateNotifier.Begin(this, _services.Store);
     }
 
     protected override void OnFormClosing(FormClosingEventArgs e)

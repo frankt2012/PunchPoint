@@ -165,6 +165,20 @@ your inbox (and optionally in each employee's).
 If you later want a live view from home, the safe way to add it is a private mesh such as
 Tailscale — no ports opened, encrypted end to end.
 
+## Updates
+
+Settings → **Updates** shows the version you are running. Once a day, when PunchPoint opens, it
+asks GitHub whether a newer release exists; if there is one, a small window shows the release
+notes with a **Download** button that opens the release page in your browser. Nothing is
+downloaded or installed without you.
+
+* **Check now** — ask immediately.
+* **Skip this version** (in the update window) — stop being reminded about that release.
+* **Releases from** — the GitHub repository, in `owner/name` form. Change it if you use your own
+  fork. The check is one anonymous HTTPS request; no usage data is sent.
+
+You can turn the automatic check off with the checkbox; manual checking still works.
+
 ## Exports
 
 Reports. All files open in Excel or Google Sheets.

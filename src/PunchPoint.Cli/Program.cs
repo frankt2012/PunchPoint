@@ -30,6 +30,7 @@ public static class Program
                 "demo" => Demo(args[1..]),
                 "doctor" => Doctor(args[1..]),
                 "pdf" => Pdf(args[1..]),
+                "update" => Update(args[1..]),
                 "help" or "-h" or "--help" => Usage(),
                 _ => Unknown(args[0]),
             };
@@ -69,6 +70,9 @@ public static class Program
                 --no-settings           Do not copy company rules
                 --misc-hours            Import transactions that carry hours (vacation etc.)
                 --reset                 Delete the target database first
+
+            Updates
+              punchpoint update [--repo owner/name] [--current x.y.z]
 
             Reporting
               punchpoint pdf <out.pdf> [--db <file>] [--period <n>]   Hours summary as PDF
@@ -401,6 +405,36 @@ public static class Program
     }
 
     private static string Fmt(int minutes) => (minutes / 60.0).ToString("0.00");
+
+    private static int Update(string[] args)
+    {
+        string? repo = null;
+        Version current = typeof(PunchPoint.Core.Updates.UpdateChecker).Assembly.GetName().Version
+                          is { } v ? new Version(v.Major, Math.Max(0, v.Minor), Math.Max(0, v.Build)) : new Version(0, 0, 0);
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--repo": repo = args[++i]; break;
+                case "--current": current = Version.Parse(args[++i]); break;
+            }
+        }
+
+        var result = PunchPoint.Core.Updates.UpdateChecker
+            .CheckAsync(repo, current).GetAwaiter().GetResult();
+
+        Console.WriteLine($"{result.Status}: {result.Message}");
+        if (result.Update is { } update)
+        {
+            Console.WriteLine($"  release: {update.ReleaseUrl}");
+            Console.WriteLine($"  tag:     {update.Tag}");
+            foreach (var asset in update.Assets)
+                Console.WriteLine($"  asset:   {asset.Name} ({asset.Size:N0} bytes)");
+        }
+
+        return result.Status == PunchPoint.Core.Updates.UpdateStatus.Failed ? 1 : 0;
+    }
 
     private static int Pdf(string[] args)
     {

@@ -69,6 +69,7 @@ self-contained executable with no runtime to install.
 | **Reports** | Ten reports with preview, print and CSV export |
 | **Export** | Payroll, generic ASCII, daily detail, punches, QuickBooks-friendly files, PDF |
 | **Email** | Payroll summary PDF when a pay period ends, optionally a time card to each employee |
+| **Updates** | Daily check of GitHub releases with notes and a download link, no silent installs |
 | **Settings** | Pay periods, rounding, overtime, day-change, shifts, holidays, appearance, backups |
 
 ## Two programs

@@ -45,6 +45,10 @@ public sealed class SettingsScreen : ScreenBase
     private readonly CheckBox _emailEmployees = Theme.Check("Also email each employee their own time card (needs an email on the employee)");
     private readonly Label _emailStatus = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
     private readonly CheckBox _encryptSecrets = Theme.Check("Encrypt stored passwords with Windows DPAPI (recommended)");
+    private readonly CheckBox _autoUpdate = Theme.Check("Check for updates automatically (once a day)");
+    private readonly TextBox _updateRepo = Theme.Input(340);
+    private readonly Label _updateStatus = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted, MaximumSize = new Size(780, 0) };
+    private Button _checkNow = null!;
     private readonly Panel _emailCard;
     private readonly DataGridView _shifts = new();
     private readonly DataGridView _holidays = new();
@@ -66,6 +70,7 @@ public sealed class SettingsScreen : ScreenBase
         stack.Add(BuildShiftCard());
         stack.Add(BuildHolidayCard());
         stack.Add(_emailCard = BuildEmailCard());
+        stack.Add(BuildUpdatesCard());
         stack.Add(BuildDataCard());
 
         _periodType.Items.AddRange(new object[] { "Weekly", "Bi-weekly", "Semi-monthly", "Monthly" });
@@ -353,9 +358,92 @@ public sealed class SettingsScreen : ScreenBase
         s.EmailPeriodSummary = _emailPeriod.Checked;
         s.EmailEmployees = _emailEmployees.Checked;
         s.EncryptSecrets = _encryptSecrets.Checked;
+        s.CheckForUpdates = _autoUpdate.Checked;
+        s.UpdateRepo = _updateRepo.Text.Trim();
         s.SmtpPassword = SecretProtector.Protect(_smtpPassword.Text, s.EncryptSecrets);
 
         return s;
+    }
+
+    private Panel BuildUpdatesCard()
+    {
+        var card = Theme.Card();
+        var stack = new StackPanel(8);
+        stack.Add(SectionTitle("Updates"));
+
+        stack.Add(new Label
+        {
+            Text = $"You are running PunchPoint {App.UpdateNotifier.CurrentVersion()}.",
+            Font = Theme.Body,
+            ForeColor = Theme.Text,
+            AutoSize = true,
+        });
+
+        stack.Add(Row("", _autoUpdate));
+        stack.Add(Row("Releases from", _updateRepo));
+
+        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 4, 0, 0) };
+        _checkNow = Theme.SecondaryButton("Check now", 130);
+        _checkNow.Click += async (_, _) => await CheckForUpdatesAsync();
+        buttons.Controls.Add(_checkNow);
+        stack.Add(buttons);
+        stack.Add(_updateStatus);
+
+        stack.Add(new Label
+        {
+            Text = "Checks GitHub for a newer release and tells you when there is one. Downloading opens " +
+                   "the release page in your browser — PunchPoint never installs anything by itself, and the " +
+                   "check sends nothing except the request itself.",
+            Font = Theme.Small,
+            ForeColor = Theme.TextMuted,
+            AutoSize = true,
+            MaximumSize = new Size(780, 0),
+        });
+
+        card.Controls.Add(stack);
+        return card;
+    }
+
+    private async Task CheckForUpdatesAsync()
+    {
+        _checkNow.Enabled = false;
+        _updateStatus.ForeColor = Theme.TextMuted;
+        _updateStatus.Text = "Checking GitHub…";
+
+        try
+        {
+            var result = await App.UpdateNotifier.CheckNowAsync(Services.Store, _updateRepo.Text.Trim());
+
+            switch (result.Status)
+            {
+                case PunchPoint.Core.Updates.UpdateStatus.Available when result.Update is not null:
+                    _updateStatus.Text = result.Message;
+                    _updateStatus.ForeColor = Theme.Success;
+
+                    if (FindForm() is MainForm owner)
+                        App.UpdateNotifier.Show(owner, Services.Store, result.Update, App.UpdateNotifier.CurrentVersion());
+                    break;
+
+                case PunchPoint.Core.Updates.UpdateStatus.UpToDate:
+                    _updateStatus.Text = result.Message;
+                    _updateStatus.ForeColor = Theme.Success;
+                    break;
+
+                default:
+                    _updateStatus.Text = result.Message;
+                    _updateStatus.ForeColor = Theme.Danger;
+                    break;
+            }
+        }
+        catch (Exception ex)
+        {
+            _updateStatus.Text = "Could not check: " + ex.Message;
+            _updateStatus.ForeColor = Theme.Danger;
+        }
+        finally
+        {
+            _checkNow.Enabled = true;
+        }
     }
 
     private Panel BuildDataCard()
@@ -451,6 +539,8 @@ public sealed class SettingsScreen : ScreenBase
         _emailPeriod.Checked = s.EmailPeriodSummary;
         _emailEmployees.Checked = s.EmailEmployees;
         _encryptSecrets.Checked = s.EncryptSecrets;
+        _autoUpdate.Checked = s.CheckForUpdates;
+        _updateRepo.Text = string.IsNullOrWhiteSpace(s.UpdateRepo) ? PunchPoint.Core.Updates.UpdateChecker.DefaultRepo : s.UpdateRepo;
         _smtpPassword.Text = SecretProtector.Unprotect(s.SmtpPassword);
 
         _appearance.SelectedIndex = (int)s.Theme;
@@ -622,6 +712,8 @@ public sealed class SettingsScreen : ScreenBase
         s.EmailPeriodSummary = _emailPeriod.Checked;
         s.EmailEmployees = _emailEmployees.Checked;
         s.EncryptSecrets = _encryptSecrets.Checked;
+        s.CheckForUpdates = _autoUpdate.Checked;
+        s.UpdateRepo = _updateRepo.Text.Trim();
         s.SmtpPassword = SecretProtector.Protect(_smtpPassword.Text, s.EncryptSecrets);
 
         s.ShowPunchCommentDialog = _punchComment.Checked;

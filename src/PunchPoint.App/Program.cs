@@ -87,7 +87,7 @@ internal static class Program
             }
 
             var services = new AppServices(store);
-            var form = new MainForm(services, startScreen ?? "dashboard");
+            var form = new MainForm(services, startScreen ?? "dashboard", checkForUpdates: tourFolder is null);
 
             if (tourFolder is not null)
             {

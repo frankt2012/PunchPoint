@@ -4,7 +4,7 @@ namespace PunchPoint.Core.Storage;
 
 public static class Schema
 {
-    public const int CurrentVersion = 9;
+    public const int CurrentVersion = 10;
 
     public static void Ensure(Database db)
     {
@@ -117,6 +117,21 @@ public static class Schema
         // Version 9 was the network page, which has been removed. Older databases may still
         // carry its unused columns; nothing reads them now.
         if (version < 9) SetVersion(db, 9);
+
+        if (version < 10)
+        {
+            foreach (var sql in new[]
+                     {
+                         "ALTER TABLE settings ADD COLUMN check_updates INTEGER NOT NULL DEFAULT 1;",
+                         "ALTER TABLE settings ADD COLUMN update_repo TEXT NOT NULL DEFAULT 'frankt2012/PunchPoint';",
+                         "ALTER TABLE settings ADD COLUMN last_update_check TEXT NOT NULL DEFAULT '';",
+                         "ALTER TABLE settings ADD COLUMN skipped_update TEXT NOT NULL DEFAULT '';",
+                     })
+            {
+                try { db.Execute(sql); } catch { /* already present */ }
+            }
+            SetVersion(db, 10);
+        }
     }
 
     private static int GetVersion(Database db)

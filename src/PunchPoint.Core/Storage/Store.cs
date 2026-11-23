@@ -84,6 +84,13 @@ public sealed class Store
             EmailPeriodSummary = r.HasColumn("email_period") && r.GetBool("email_period"),
             EmailEmployees = r.HasColumn("email_employees") && r.GetBool("email_employees"),
             EncryptSecrets = r.HasColumn("encrypt_secrets") && r.GetBool("encrypt_secrets"),
+            CheckForUpdates = !r.HasColumn("check_updates") || r.GetBool("check_updates", true),
+            UpdateRepo = r.HasColumn("update_repo") ? r.GetStringOrNull("update_repo") ?? "" : "",
+            LastUpdateCheck = r.HasColumn("last_update_check") && r.GetStringOrNull("last_update_check") is string when_
+                && DateTime.TryParse(when_, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed)
+                    ? parsed
+                    : null,
+            SkippedUpdateVersion = r.HasColumn("skipped_update") ? r.GetStringOrNull("skipped_update") ?? "" : "",
             LastBackupPath = r.GetStringOrNull("last_backup_path") ?? "",
         });
 
@@ -114,6 +121,8 @@ public sealed class Store
                 report_email = $reportEmail, email_period = $emailPeriod,
                 email_employees = $emailEmployees,
                 encrypt_secrets = $encryptSecrets,
+                check_updates = $checkUpdates, update_repo = $updateRepo,
+                last_update_check = $lastCheck, skipped_update = $skippedUpdate,
                 last_backup_path = $backup
             WHERE id = 1;
             """,
@@ -140,6 +149,10 @@ public sealed class Store
             ("$reportEmail", s.ReportEmail), ("$emailPeriod", s.EmailPeriodSummary ? 1 : 0),
             ("$emailEmployees", s.EmailEmployees ? 1 : 0),
             ("$encryptSecrets", s.EncryptSecrets ? 1 : 0),
+            ("$checkUpdates", s.CheckForUpdates ? 1 : 0),
+            ("$updateRepo", s.UpdateRepo),
+            ("$lastCheck", s.LastUpdateCheck is DateTime checkedAt ? Format(checkedAt) : ""),
+            ("$skippedUpdate", s.SkippedUpdateVersion),
             ("$backup", s.LastBackupPath));
     }
 

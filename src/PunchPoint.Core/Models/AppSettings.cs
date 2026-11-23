@@ -100,6 +100,19 @@ public sealed class AppSettings
     /// <summary>Encrypt stored passwords with Windows DPAPI (per Windows account).</summary>
     public bool EncryptSecrets { get; set; }
 
+    // ---- updates ----
+    /// <summary>Look for a newer release on GitHub once a day.</summary>
+    public bool CheckForUpdates { get; set; } = true;
+
+    /// <summary>GitHub repository that publishes releases, as owner/name.</summary>
+    public string UpdateRepo { get; set; } = "frankt2012/PunchPoint";
+
+    /// <summary>When the last check finished, so it runs at most once a day.</summary>
+    public DateTime? LastUpdateCheck { get; set; }
+
+    /// <summary>A version the user asked not to be reminded about.</summary>
+    public string SkippedUpdateVersion { get; set; } = "";
+
     public string LastBackupPath { get; set; } = "";
     public int SchemaVersion { get; set; } = 1;
 }
