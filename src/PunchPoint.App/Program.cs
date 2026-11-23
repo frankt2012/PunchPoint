@@ -82,7 +82,7 @@ internal static class Program
                 // small report, then exit. Used to verify the UI on a real desktop.
                 Directory.CreateDirectory(tourFolder);
                 form.WindowState = FormWindowState.Maximized;
-                form.Shown += (_, _) => new ScreenTour(form, tourFolder, database.Path).Start();
+                form.Shown += (_, _) => new ScreenTour(form, tourFolder, database.Path, services).Start();
             }
 
             Application.Run(form);

@@ -77,27 +77,43 @@ public sealed class TimeCardsScreen : ScreenBase
             Padding = new Padding(16, 10, 16, 8),
             Margin = new Padding(0, 10, 0, 0),
         };
-        _totals.Location = new Point(14, 10);
-        _status.Location = new Point(14, 38);
-        totalsCard.Controls.Add(_totals);
-        totalsCard.Controls.Add(_status);
+
+        var totalsLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 1,
+            Margin = new Padding(0),
+        };
+        totalsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        totalsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+        var totalsText = new StackPanel(2);
+        totalsText.Add(_totals);
+        totalsText.Add(_status);
+
+        var totalsButtons = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Anchor = AnchorStyles.Right,
+            Margin = new Padding(0, 6, 0, 0),
+        };
 
         var adjust = Theme.SecondaryButton("Edit totals", 110);
-        adjust.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        adjust.Location = new Point(totalsCard.Width - 130, 16);
         adjust.Click += (_, _) => AdjustTotals();
-        totalsCard.Controls.Add(adjust);
-        totalsCard.Resize += (_, _) => adjust.Left = totalsCard.Width - 130;
+        totalsButtons.Controls.Add(adjust);
+        totalsButtons.Controls.Add(_delete);
+        totalsButtons.Controls.Add(_edit);
 
-        _delete.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        _delete.Location = new Point(totalsCard.Width - 240, 16);
+        totalsLayout.Controls.Add(totalsText, 0, 0);
+        totalsLayout.Controls.Add(totalsButtons, 1, 0);
+        totalsCard.Controls.Add(totalsLayout);
+
         _delete.Click += (_, _) => DeleteSelected();
-        totalsCard.Controls.Add(_delete);
-
-        _edit.Anchor = AnchorStyles.Top | AnchorStyles.Right;
-        _edit.Location = new Point(totalsCard.Width - 336, 16);
         _edit.Click += (_, _) => EditSelected();
-        totalsCard.Controls.Add(_edit);
 
         layout.Controls.Add(totalsCard, 0, 1);
 

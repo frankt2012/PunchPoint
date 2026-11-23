@@ -25,28 +25,33 @@ public abstract class ScreenBase : UserControl, IRefreshable
             Padding = new Padding(0),
             Margin = new Padding(0),
         };
-        root.RowStyles.Add(new RowStyle(SizeType.Absolute, 92));
+        root.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
+        // Title and actions sit on separate rows, so a narrow window can never push the
+        // action buttons over the heading text.
         var header = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 2,
-            RowCount = 1,
-            Padding = new Padding(28, 22, 28, 0),
+            ColumnCount = 1,
+            RowCount = 2,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Padding = new Padding(28, 20, 28, 6),
             Margin = new Padding(0),
         };
-        header.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        header.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+        header.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        header.RowStyles.Add(new RowStyle(SizeType.AutoSize));
 
-        var titles = new Panel { Dock = DockStyle.Fill, Margin = new Padding(0) };
+        var titles = new Panel { Dock = DockStyle.Top, AutoSize = true, AutoSizeMode = AutoSizeMode.GrowAndShrink, Margin = new Padding(0) };
         _title = new Label
         {
             Text = title,
             Font = Theme.H1,
             ForeColor = Theme.Text,
             AutoSize = true,
-            Location = new Point(0, 0),
+            Dock = DockStyle.Top,
+            Margin = new Padding(0, 0, 0, 2),
         };
         _subtitle = new Label
         {
@@ -54,23 +59,24 @@ public abstract class ScreenBase : UserControl, IRefreshable
             Font = Theme.Body,
             ForeColor = Theme.TextMuted,
             AutoSize = true,
-            Location = new Point(2, 40),
+            Dock = DockStyle.Top,
         };
         titles.Controls.Add(_title);
         titles.Controls.Add(_subtitle);
 
         Actions = new FlowLayoutPanel
         {
-            Dock = DockStyle.Fill,
+            Dock = DockStyle.Top,
             FlowDirection = FlowDirection.LeftToRight,
-            WrapContents = false,
+            WrapContents = true,
             AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
             Margin = new Padding(0),
-            Padding = new Padding(0, 8, 0, 0),
+            Padding = new Padding(0, 6, 0, 0),
         };
 
         header.Controls.Add(titles, 0, 0);
-        header.Controls.Add(Actions, 1, 0);
+        header.Controls.Add(Actions, 0, 1);
 
         Body = new Panel
         {

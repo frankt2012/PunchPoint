@@ -200,7 +200,7 @@ public class EditorDialog : Form
             Padding = new Padding(0),
             Margin = new Padding(0),
         };
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 150));
+        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         return grid;
     }
@@ -212,7 +212,7 @@ public class EditorDialog : Form
         var text = FieldLabel(label);
         text.Anchor = AnchorStyles.Left;
         text.Margin = new Padding(0, 12, 8, 4);
-        control.Anchor = AnchorStyles.Left | AnchorStyles.Right;
+        control.Dock = DockStyle.Fill;
         control.Margin = new Padding(0, 8, 0, 4);
         grid.Controls.Add(text, 0, row);
         grid.Controls.Add(control, 1, row);

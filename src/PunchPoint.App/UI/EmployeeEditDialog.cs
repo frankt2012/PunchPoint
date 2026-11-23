@@ -31,7 +31,7 @@ public sealed class EmployeeEditDialog : EditorDialog
     public EmployeeEditDialog(AppServices services, Employee? employee)
         : base(employee is null ? "Add employee" : "Edit employee",
             employee is null ? "Create a profile so this person can clock in" : "Update this employee’s details",
-            580, 760)
+            700, 820)
     {
         _services = services;
         _isNew = employee is null;
@@ -42,9 +42,9 @@ public sealed class EmployeeEditDialog : EditorDialog
         stack.Add(grid);
         Body.Controls.Add(stack);
 
-        var nameRow = new TableLayoutPanel { ColumnCount = 3, AutoSize = true, Dock = DockStyle.Fill };
+        var nameRow = new TableLayoutPanel { ColumnCount = 3, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0) };
         nameRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        nameRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 84));
+        nameRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96));
         nameRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
         _first.Dock = DockStyle.Fill;
         _middle.Dock = DockStyle.Fill;

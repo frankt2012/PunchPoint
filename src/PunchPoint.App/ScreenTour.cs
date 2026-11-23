@@ -1,3 +1,4 @@
+using PunchPoint.App.UI;
 using System.Drawing.Imaging;
 using System.Text;
 
@@ -27,15 +28,17 @@ internal sealed class ScreenTour
     private readonly MainForm _form;
     private readonly string _folder;
     private readonly string _dbPath;
+    private readonly AppServices _services;
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 900 };
     private int _index = -1;
     private readonly StringBuilder _report = new();
 
-    public ScreenTour(MainForm form, string folder, string dbPath)
+    public ScreenTour(MainForm form, string folder, string dbPath, AppServices services)
     {
         _form = form;
         _folder = folder;
         _dbPath = dbPath;
+        _services = services;
         _timer.Tick += (_, _) => Next();
     }
 
@@ -52,6 +55,7 @@ internal sealed class ScreenTour
         if (_index >= Screens.Length)
         {
             _timer.Stop();
+            CaptureWindowedLayouts();
             WriteReport();
             _form.SuppressCloseConfirmation = true;
             _form.Close();
@@ -74,6 +78,57 @@ internal sealed class ScreenTour
         catch (Exception ex)
         {
             _report.AppendLine($"{name}: FAILED {ex.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// The screens above are maximised. These extra captures check the layouts people
+    /// actually hit: a normal-sized window (where headings used to collide with the
+    /// action buttons) and the dialogs with editable fields.
+    /// </summary>
+    private void CaptureWindowedLayouts()
+    {
+        try
+        {
+            _form.WindowState = FormWindowState.Normal;
+            _form.Size = new Size(1180, 780);
+            _form.Location = new Point(40, 40);
+            Application.DoEvents();
+
+            foreach (var (key, name) in new[]
+                     {
+                         ("dashboard", "11-windowed-dashboard"),
+                         ("timecards", "12-windowed-punchediting"),
+                         ("settings", "13-windowed-settings"),
+                     })
+            {
+                _form.Show(key);
+                _form.Refresh();
+                Application.DoEvents();
+                Thread.Sleep(450);
+                Capture(Path.Combine(_folder, name + ".png"));
+                _report.AppendLine($"{name}: captured");
+            }
+
+            using var dialog = new EmployeeEditDialog(_services, null)
+            {
+                StartPosition = FormStartPosition.Manual,
+                Location = new Point(60, 60),
+            };
+            dialog.Show();
+            Application.DoEvents();
+            Thread.Sleep(500);
+            using (var bitmap = new Bitmap(dialog.Width, dialog.Height))
+            {
+                dialog.DrawToBitmap(bitmap, new Rectangle(0, 0, dialog.Width, dialog.Height));
+                bitmap.Save(Path.Combine(_folder, "14-add-employee.png"), ImageFormat.Png);
+            }
+            _report.AppendLine("14-add-employee: captured");
+            dialog.Close();
+        }
+        catch (Exception ex)
+        {
+            _report.AppendLine($"windowed capture failed: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
