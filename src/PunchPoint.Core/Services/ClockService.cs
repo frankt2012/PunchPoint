@@ -46,36 +46,62 @@ public sealed class ClockService
         var last = _store.GetLastPunch(employee.Id);
 
         if (last is null)
-        {
             return new ClockStatus { Employee = employee, LastPunch = null };
-        }
 
-        bool clockedIn = last.Kind is PunchKind.In or PunchKind.BreakOut;
+        // Clocked in unless the most recent punch was a clock-out. A break ending
+        // (BreakIn) leaves the employee on the clock, which the old check missed.
+        bool clockedIn = last.Kind != PunchKind.Out;
         bool onBreak = last.Kind == PunchKind.BreakOut;
 
-        // Minutes worked today (closed IN→OUT pairs only), for the kiosk display.
+        // Walk the recent punches to find the open session and today's worked minutes.
+        // 36 hours back so an overnight session is understood.
+        var punches = _store.ListPunches(employee.Id, moment.AddHours(-36), moment.AddHours(1));
+
         int minutesToday = 0;
-        DateTime? openIn = null;
-        foreach (var p in _store.ListPunches(employee.Id, moment.Date, moment.Date.AddDays(1).AddSeconds(-1)))
+        DateTime? sessionStart = null;
+        DateTime? breakStart = null;
+        int breakMinutes = 0;
+
+        foreach (var punch in punches)
         {
-            if (p.Kind == PunchKind.In && openIn is null)
+            switch (punch.Kind)
             {
-                openIn = p.Timestamp;
-            }
-            else if (p.Kind == PunchKind.Out && openIn is not null)
-            {
-                minutesToday += Math.Max(0, (int)Math.Round((p.Timestamp - openIn.Value).TotalMinutes));
-                openIn = null;
+                case PunchKind.In:
+                    sessionStart = punch.Timestamp;
+                    breakStart = null;
+                    breakMinutes = 0;
+                    break;
+
+                case PunchKind.BreakOut:
+                    if (sessionStart is not null) breakStart = punch.Timestamp;
+                    break;
+
+                case PunchKind.BreakIn:
+                    if (breakStart is not null)
+                    {
+                        breakMinutes += Math.Max(0, (int)Math.Round((punch.Timestamp - breakStart.Value).TotalMinutes));
+                        breakStart = null;
+                    }
+                    break;
+
+                case PunchKind.Out:
+                    if (sessionStart is not null)
+                    {
+                        if (sessionStart.Value.Date >= moment.Date)
+                        {
+                            int worked = (int)Math.Round((punch.Timestamp - sessionStart.Value).TotalMinutes) - breakMinutes;
+                            minutesToday += Math.Max(0, worked);
+                        }
+                        sessionStart = null;
+                        breakStart = null;
+                        breakMinutes = 0;
+                    }
+                    break;
             }
         }
 
-        DateTime? since = null;
-        if (clockedIn)
-        {
-            since = last.Kind == PunchKind.BreakOut
-                ? openIn
-                : last.Timestamp;
-        }
+        // If the employee is still on the clock, sessionStart is the current IN.
+        DateTime? since = clockedIn ? sessionStart ?? last.Timestamp : null;
 
         return new ClockStatus
         {
