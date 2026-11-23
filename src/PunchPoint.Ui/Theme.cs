@@ -245,7 +245,7 @@ public static class Theme
 
     public static ComboBox Dropdown(int width = 260)
     {
-        var combo = new ComboBox
+        var combo = new ThemedComboBox
         {
             Width = width,
             Font = Body,
@@ -261,7 +261,6 @@ public static class Theme
             combo.DrawMode = DrawMode.OwnerDrawFixed;
             combo.ItemHeight = 22;
             combo.DrawItem += PaintComboItem;
-            combo.Paint += PaintComboFace;
         }
         return combo;
     }
@@ -288,23 +287,28 @@ public static class Theme
     /// <summary>
     /// Paints the closed box: background, selected text, then a chevron. Windows draws the
     /// combo's own face and arrow with the system colours and ignores BackColor, so covering
-    /// them here is what makes a drop-down look right in dark mode.
+    /// them is what makes a drop-down look right in dark mode. Called from the control's
+    /// WndProc *after* the native paint, which is the only way to draw over the arrow button.
     /// </summary>
-    private static void PaintComboFace(object? sender, PaintEventArgs e)
+    internal static void PaintComboSurface(ComboBox combo, IntPtr deviceContext)
     {
-        if (sender is not ComboBox combo) return;
+        if (!combo.IsHandleCreated) return;
+
+        using var graphics = deviceContext == IntPtr.Zero
+            ? Graphics.FromHwnd(combo.Handle)
+            : Graphics.FromHdc(deviceContext);
 
         int arrowWidth = SystemInformation.VerticalScrollBarWidth + 4;
         var client = combo.ClientRectangle;
 
         using (var fill = new SolidBrush(InputBackground))
-            e.Graphics.FillRectangle(fill, client);
+            graphics.FillRectangle(fill, client);
 
         string text = combo.Text;
         if (text.Length > 0)
         {
             var bounds = new Rectangle(5, client.Top, Math.Max(0, client.Width - arrowWidth - 5), client.Height);
-            TextRenderer.DrawText(e.Graphics, text, Body, bounds,
+            TextRenderer.DrawText(graphics, text, Body, bounds,
                 combo.Enabled ? Text : TextFaint,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
         }
@@ -313,8 +317,8 @@ public static class Theme
         {
             int cx = client.Right - arrowWidth / 2 - 1;
             int cy = client.Top + client.Height / 2;
-            e.Graphics.DrawLine(pen, cx - 4, cy - 2, cx, cy + 2);
-            e.Graphics.DrawLine(pen, cx, cy + 2, cx + 4, cy - 2);
+            graphics.DrawLine(pen, cx - 4, cy - 2, cx, cy + 2);
+            graphics.DrawLine(pen, cx, cy + 2, cx + 4, cy - 2);
         }
     }
 
@@ -508,6 +512,9 @@ public static class Theme
         grid.MultiSelect = false;
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
         grid.Dock = DockStyle.Fill;
+
+        if (IsDark)
+            grid.HandleCreated += (_, _) => NativeTheme(grid.Handle);
     }
 
     /// <summary>Draws a rounded rectangle path, used for the kiosk button accents.</summary>
@@ -598,5 +605,32 @@ public sealed class StackPanel : TableLayoutPanel
         control.Margin = new Padding(0, 0, 0, _spacing);
         Controls.Add(control, 0, RowCount - 1);
         return control;
+    }
+}
+
+/// <summary>
+/// A combo box that repaints its face after Windows has drawn it. Needed in dark mode:
+/// the native arrow button ignores BackColor and would otherwise stay light.
+/// </summary>
+internal sealed class ThemedComboBox : ComboBox
+{
+    private const int WM_PAINT = 0x000F;
+    private const int WM_PRINTCLIENT = 0x0318;
+
+    protected override void WndProc(ref Message m)
+    {
+        base.WndProc(ref m);
+
+        if (!Theme.IsDark) return;
+
+        if (m.Msg == WM_PAINT)
+        {
+            Theme.PaintComboSurface(this, IntPtr.Zero);
+        }
+        else if (m.Msg == WM_PRINTCLIENT && m.WParam != IntPtr.Zero)
+        {
+            // DrawToBitmap and other WM_PRINT paths need the same treatment.
+            Theme.PaintComboSurface(this, m.WParam);
+        }
     }
 }

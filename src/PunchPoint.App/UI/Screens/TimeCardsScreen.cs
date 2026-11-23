@@ -11,8 +11,8 @@ namespace PunchPoint.App.UI.Screens;
 /// </summary>
 public sealed class TimeCardsScreen : ScreenBase
 {
-    private readonly ComboBox _employee = Theme.Dropdown(260);
-    private readonly ComboBox _period = Theme.Dropdown(240);
+    private readonly ComboBox _employee = Theme.Dropdown(220);
+    private readonly ComboBox _period = Theme.Dropdown(265);
     private readonly DataGridView _grid = new();
     private readonly Label _totals = new() { AutoSize = true, Font = new Font(Theme.Family, 10.5f, FontStyle.Bold), ForeColor = Theme.Text };
     private readonly Label _status = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
@@ -42,7 +42,7 @@ public sealed class TimeCardsScreen : ScreenBase
         add.Click += (_, _) => AddPunch();
         Actions.Controls.Add(add);
 
-        var print = Theme.SecondaryButton("Print", 80);
+        var print = Theme.SecondaryButton("Print", 70);
         print.Margin = new Padding(0, 5, 0, 0);
         print.Click += (_, _) => PrintTimeCard();
         Actions.Controls.Add(print);

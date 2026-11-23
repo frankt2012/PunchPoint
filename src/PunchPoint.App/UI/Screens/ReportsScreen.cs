@@ -28,8 +28,8 @@ public sealed class ReportsScreen : ScreenBase
     };
 
     private readonly ListBox _list = Theme.List();
-    private readonly ComboBox _periods = Theme.Dropdown(240);
-    private readonly ComboBox _employeeFilter = Theme.Dropdown(220);
+    private readonly ComboBox _periods = Theme.Dropdown(270);
+    private readonly ComboBox _employeeFilter = Theme.Dropdown(190);
     private readonly DataGridView _grid = new();
     private readonly Label _summary = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
 
@@ -48,22 +48,22 @@ public sealed class ReportsScreen : ScreenBase
         _employeeFilter.SelectedIndexChanged += (_, _) => Build();
         Actions.Controls.Add(_employeeFilter);
 
-        var print = Theme.SecondaryButton("Print", 80);
+        var print = Theme.SecondaryButton("Print", 70);
         print.Margin = new Padding(0, 5, 6, 0);
         print.Click += (_, _) => PrintReport();
         Actions.Controls.Add(print);
 
-        var email = Theme.SecondaryButton("Email", 90);
+        var email = Theme.SecondaryButton("Email", 76);
         email.Margin = new Padding(0, 5, 6, 0);
         email.Click += (_, _) => EmailSummary();
         Actions.Controls.Add(email);
 
-        var pdf = Theme.SecondaryButton("PDF", 80);
+        var pdf = Theme.SecondaryButton("PDF", 64);
         pdf.Margin = new Padding(0, 5, 6, 0);
         pdf.Click += (_, _) => ExportPdf();
         Actions.Controls.Add(pdf);
 
-        var export = Theme.PrimaryButton("Export CSV", 120);
+        var export = Theme.PrimaryButton("Export CSV", 112);
         export.Margin = new Padding(0, 5, 0, 0);
         export.Click += (_, _) => ExportReport();
         Actions.Controls.Add(export);
@@ -184,12 +184,19 @@ public sealed class ReportsScreen : ScreenBase
         }
 
         foreach (string column in _table.Columns)
+        {
+            bool wide = column.Contains("Note", StringComparison.OrdinalIgnoreCase) ||
+                        column.Contains("Comment", StringComparison.OrdinalIgnoreCase) ||
+                        column.Contains("Employee", StringComparison.OrdinalIgnoreCase);
+
             _grid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 HeaderText = column,
-                FillWeight = 100,
+                FillWeight = wide ? 220 : 100,
+                MinimumWidth = TextRenderer.MeasureText(column, Theme.SmallBold).Width + 26,
                 SortMode = DataGridViewColumnSortMode.NotSortable,
             });
+        }
 
         foreach (var row in _table.Rows)
             _grid.Rows.Add(row.ToArray());

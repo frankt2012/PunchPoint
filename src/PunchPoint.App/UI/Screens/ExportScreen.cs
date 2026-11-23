@@ -11,7 +11,7 @@ namespace PunchPoint.App.UI.Screens;
 /// </summary>
 public sealed class ExportScreen : ScreenBase
 {
-    private readonly ComboBox _periods = Theme.Dropdown(260);
+    private readonly ComboBox _periods = Theme.Dropdown(280);
     private readonly ComboBox _format = Theme.Dropdown(300);
     private readonly ComboBox _who = Theme.Dropdown(220);
     private readonly CheckBox _approvedOnly = Theme.Check("Only export approved time cards");
@@ -31,7 +31,7 @@ public sealed class ExportScreen : ScreenBase
         export.Click += (_, _) => RunExport();
         Actions.Controls.Add(export);
 
-        var check = Theme.SecondaryButton("Check approvals", 140);
+        var check = Theme.SecondaryButton("Check approvals", 170);
         check.Click += (_, _) => ShowApprovals();
         Actions.Controls.Add(check);
 
