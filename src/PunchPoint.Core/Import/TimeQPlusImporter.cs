@@ -258,8 +258,27 @@ public sealed class TimeQPlusImporter
                 }
                 else
                 {
+                    // Two legacy employees can share a badge or PIN. The new database
+                    // requires both to be unique, so resolve the clash instead of failing
+                    // the whole import.
                     if (string.IsNullOrWhiteSpace(mapped.Pin))
+                    {
                         mapped.Pin = MakeUniquePin(store, mapped);
+                    }
+                    else if (store.FindByPin(mapped.Pin) is not null)
+                    {
+                        result.Warnings.Add(
+                            $"{mapped.DisplayName}: PIN {mapped.Pin} is already in use; a new PIN was assigned.");
+                        mapped.Pin = MakeUniquePin(store, mapped);
+                    }
+
+                    if (mapped.Badge.Length > 0 && store.FindByBadge(mapped.Badge) is not null)
+                    {
+                        result.Warnings.Add(
+                            $"{mapped.DisplayName}: badge {mapped.Badge} is already in use; it was cleared.");
+                        mapped.Badge = "";
+                    }
+
                     store.InsertEmployee(mapped);
                     result.EmployeesAdded++;
                     employeeMap[legacyId] = mapped;

@@ -10,6 +10,7 @@ public sealed class PunchesScreen : ScreenBase
     private readonly DateTimePicker _to = new() { Format = DateTimePickerFormat.Short, Width = 130, Font = Theme.Body };
     private readonly ComboBox _employeeFilter = Theme.Dropdown(220);
     private List<Employee> _employees = new();
+    private bool _loading;
 
     public PunchesScreen(AppServices services)
         : base(services, "Punches", "Every clock event, newest first")
@@ -60,6 +61,20 @@ public sealed class PunchesScreen : ScreenBase
     }
 
     public override void RefreshData()
+    {
+        if (_loading) return;
+        _loading = true;
+        try
+        {
+            LoadPunches();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private void LoadPunches()
     {
         _employees = Services.Store.ListEmployees(includeInactive: true);
 

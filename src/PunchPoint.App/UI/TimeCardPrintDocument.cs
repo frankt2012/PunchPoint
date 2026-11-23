@@ -47,6 +47,7 @@ public sealed class TimeCardPrintDocument : PrintDocument
         using var linePen = new Pen(Color.FromArgb(0xCB, 0xD5, 0xE1));
         using var headerBrush = new SolidBrush(Color.FromArgb(0x0F, 0x17, 0x2A));
         using var mutedBrush = new SolidBrush(Color.FromArgb(0x64, 0x74, 0x8B));
+        using var warningBrush = new SolidBrush(Color.FromArgb(0xD9, 0x77, 0x06));
 
         // Header
         g.DrawString(_settings.CompanyName, titleFont, headerBrush, bounds.Left, y);
@@ -113,8 +114,7 @@ public sealed class TimeCardPrintDocument : PrintDocument
 
             if (day.Issues.Count > 0)
             {
-                g.DrawString("! " + day.Issues[0], smallFont, new SolidBrush(Color.FromArgb(0xD9, 0x77, 0x06)),
-                    bounds.Left + 110, y);
+                g.DrawString("! " + day.Issues[0], smallFont, warningBrush, bounds.Left + 110, y);
                 y += 15;
             }
         }

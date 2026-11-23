@@ -65,11 +65,13 @@ public sealed class ClockScreen : ScreenBase
         _message.Location = new Point(28, 136);
         _message.MaximumSize = new Size(560, 0);
         clockStack.Controls.Add(_message);
-        clockCard.Controls.Add(clockStack);
 
         _feedback.Font = new Font(Theme.Family, 12f, FontStyle.Bold);
-        _feedback.Location = new Point(28, 190);
-        clockCard.Controls.Add(_feedback);
+        _feedback.Location = new Point(0, 190);
+        clockStack.Controls.Add(_feedback);
+        _feedback.BringToFront();
+
+        clockCard.Controls.Add(clockStack);
 
         left.Controls.Add(clockCard, 0, 0);
 
@@ -305,7 +307,6 @@ public sealed class ClockScreen : ScreenBase
         {
             var now = DateTime.Now;
             var punch = Services.Clock.Punch(_selected, kind, now);
-            Services.NotifyDataChanged();
 
             string label = kind switch
             {
@@ -317,6 +318,7 @@ public sealed class ClockScreen : ScreenBase
             };
 
             _showingResult = true;
+            _resetAt = DateTime.Now.AddSeconds(5);
             _personButtons.Controls.Clear();
             _personState.Text = $"{label} at {Fmt.Time(punch.Timestamp)}";
             _personState.ForeColor = kind == PunchKind.In ? Theme.Success : Theme.Text;
@@ -328,8 +330,8 @@ public sealed class ClockScreen : ScreenBase
             _feedback.ForeColor = Theme.Success;
             _feedback.Text = $"{_selected.FirstName} — {label} {Fmt.Time(punch.Timestamp)}";
 
-            _resetAt = DateTime.Now.AddSeconds(5);
             RefreshRecent();
+            Services.NotifyDataChanged();
         }
         catch (Exception ex)
         {
@@ -369,9 +371,9 @@ public sealed class ClockScreen : ScreenBase
             _countdown.Text = $"Returns to the PIN screen in {seconds}s";
             if (seconds <= 0) ResetKiosk();
         }
-        else
+        else if (Visible && _pinCard.Visible && !_pin.Focused)
         {
-            if (!_pin.Focused) _pin.Focus();
+            _pin.Focus();
         }
     }
 
@@ -379,7 +381,10 @@ public sealed class ClockScreen : ScreenBase
     {
         _message.Text = Services.Settings.CompanyMessage;
         RefreshRecent();
-        if (_selected is not null)
+
+        // While a confirmation is on screen, leave it alone; the person card is
+        // rebuilt when the kiosk returns to the PIN pad.
+        if (_selected is not null && !_showingResult && Visible)
         {
             var refreshed = Services.Store.GetEmployee(_selected.Id);
             if (refreshed is not null) ShowPerson(refreshed);
