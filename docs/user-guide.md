@@ -21,6 +21,13 @@ Employees → **Add employee**.
 Deactivating an employee keeps their history and stops them clocking in. Deleting removes
 their punches too — prefer deactivate for anyone who has left.
 
+## Importing
+
+Import → **Import the whole Data folder (all history)…** and choose
+`C:\ProgramData\Acroprint\timeQplusV3`. Everything in `Archives` is imported as well, so
+former employees and their punches come across too. Use *Show inactive* on the Employees
+screen to see people who no longer work here.
+
 ## Reviewing hours
 
 **Time Cards** → choose a pay period at the top.

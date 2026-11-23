@@ -50,12 +50,15 @@ then move the shortcut into `shell:startup` (Win+R → `shell:startup`).
 ## Importing from timeQplus
 
 1. Open **Import**.
-2. Press **Find it** — PunchPoint looks for the database in the usual places:
-   `C:\ProgramData\Acroprint\timeQplusV3\Data\arx_active.mdb`
-   (older installs: `C:\Program Files\Acroprint\timeQplusV3\Data\`).
+2. Press **Find it** — PunchPoint looks for the data folder in the usual places:
+   `C:\ProgramData\Acroprint\timeQplusV3\` (older installs: `C:\Program Files\Acroprint\timeQplusV3\`).
    If the old software is on another PC, copy its whole `timeQplusV3` folder to this PC first.
-3. Check the preview: employee list, punch counts, date range, and how IN/OUT was detected.
-4. Press **Start import**. A backup is taken first, and running it twice is safe.
+3. For your full history press **Import the whole Data folder (all history)** and choose that folder.
+   PunchPoint then reads `arx_active.mdb` **and every weekly snapshot in `Archives\`**, oldest first —
+   in a typical installation that is several years of punches in one step.
+   (Choosing just `arx_active.mdb` imports only the current period.)
+4. Check the preview: employee list, punch counts, date range, and the first-day punch sequence.
+5. Press **Start import**. A backup is taken first, and running it twice is safe.
 
 What is imported: employees (name, PIN, badge, number, hire date, custom fields),
 all punches, shifts, pay periods, paid holidays, company overtime/rounding rules, and

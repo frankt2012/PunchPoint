@@ -25,6 +25,7 @@ public static class Program
                 "hex" => Hex(args[1..]),
                 "preview" => Preview(args[1..]),
                 "import" => Import(args[1..]),
+                "import-folder" => ImportFolder(args[1..]),
                 "timecards" => TimeCards(args[1..]),
                 "demo" => Demo(args[1..]),
                 "doctor" => Doctor(args[1..]),
@@ -58,6 +59,7 @@ public static class Program
               punchpoint preview <db.mdb>                 What an import would bring in
 
             Import
+              punchpoint import-folder <folder> [options]   Import arx_active.mdb + Archives/*.mdb
               punchpoint import <db.mdb> [options]
                 --db <punchpoint.db>    Target database (default: app data folder)
                 --from <yyyy-mm-dd>     Only punches on/after this date
@@ -260,6 +262,74 @@ public static class Program
         foreach (var error in result.Errors) Console.WriteLine($"  ERROR {error}");
 
         return result.Success ? 0 : 2;
+    }
+
+    private static int ImportFolder(string[] args)
+    {
+        if (args.Length < 1) return Usage();
+
+        string folder = args[0];
+        string? dbPath = null;
+        bool miscHours = false;
+        bool reset = false;
+        DateTime? from = null, to = null;
+
+        for (int i = 1; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--db": dbPath = args[++i]; break;
+                case "--misc-hours": miscHours = true; break;
+                case "--reset": reset = true; break;
+                case "--from": from = DateTime.Parse(args[++i], CultureInfo.InvariantCulture); break;
+                case "--to": to = DateTime.Parse(args[++i], CultureInfo.InvariantCulture); break;
+                default:
+                    Console.Error.WriteLine($"Unknown option '{args[i]}'.");
+                    return 1;
+            }
+        }
+
+        if (reset && dbPath is not null && File.Exists(dbPath))
+        {
+            foreach (string suffix in new[] { "", "-wal", "-shm" })
+            {
+                if (File.Exists(dbPath + suffix)) File.Delete(dbPath + suffix);
+            }
+        }
+
+        var files = TimeQPlusFolderImporter.DiscoverDatabases(folder);
+        Console.WriteLine($"Found {files.Count} database file(s) under {folder}");
+        if (files.Count == 0) return 1;
+
+        using var database = dbPath is null ? Database.OpenDefault() : Database.Open(dbPath);
+        var store = new Store(database);
+
+        var options = new ImportOptions
+        {
+            ImportMiscHours = miscHours,
+            FromDate = from,
+            ToDate = to,
+        };
+
+        var result = TimeQPlusFolderImporter.Import(store, files, options,
+            (done, total, message) => Console.Error.WriteLine($"  [{done}/{total}] {message}"));
+
+        Console.WriteLine($"Imported {result.FilesImported} of {files.Count} file(s) in {result.Duration.TotalSeconds:0.0}s");
+        Console.WriteLine($"  employees added:   {result.EmployeesAdded}");
+        Console.WriteLine($"  employees updated: {result.EmployeesUpdated}");
+        Console.WriteLine($"  punches added:     {result.PunchesAdded}");
+        Console.WriteLine($"  punches skipped:   {result.PunchesSkipped}");
+        Console.WriteLine($"  unmatched punches: {result.UnmatchedPunches}");
+        Console.WriteLine($"  target database:   {database.Path}");
+
+        foreach (var warning in result.Warnings.Take(10))
+            Console.WriteLine($"  ! {warning}");
+
+        var failures = result.Files.Where(f => !f.Result.Success).ToList();
+        foreach (var (file, failed) in failures)
+            Console.WriteLine($"  ERROR {Path.GetFileName(file)}: {string.Join("; ", failed.Errors)}");
+
+        return failures.Count == 0 ? 0 : 2;
     }
 
     // =================================================================

@@ -17,6 +17,9 @@ public sealed class LegacyTransaction
     public int? TimeCardId { get; init; }
 
     public PunchKind Kind { get; set; } = PunchKind.In;
+
+    /// <summary>Employee resolved from the TimeCards link (or badge) before pairing.</summary>
+    public int EmployeeId { get; set; } = -1;
 }
 
 /// <summary>An employee row from the legacy database plus its unchanged shift reference.</summary>
@@ -93,19 +96,23 @@ public sealed class TimeQPlusImporter
         preview.PayPeriodCount = SafeCount(db, "PayPeriods");
         preview.HolidayCount = SafeCount(db, "Holidays");
 
+        var lookup = BuildEmployeeLookup(employees);
+        var timeCardMap = BuildTimeCardEmployeeMap(db);
+        var known = employees.Where(e => e.Employee.LegacyId is not null)
+            .Select(e => e.Employee.LegacyId!.Value).ToHashSet();
+        ResolveEmployees(transactions, lookup, timeCardMap, known);
+
         var detection = PunchDirectionDetector.Detect(transactions, options.DirectionMode);
         preview.DetectedDirection = detection.Description;
         preview.DirectionConfidence = detection.Confidence;
 
         PunchDirectionDetector.Assign(transactions, detection);
 
-        var lookup = BuildEmployeeLookup(employees);
         var byEmployee = transactions
             .Where(t => t.Kind is PunchKind.In or PunchKind.Out or PunchKind.BreakIn or PunchKind.BreakOut)
-            .Select(t => (Id: ResolveEmployeeId(t, lookup), Transaction: t))
-            .Where(x => x.Id >= 0)
-            .GroupBy(x => x.Id)
-            .ToDictionary(g => g.Key, g => g.Select(x => x.Transaction).OrderBy(t => t.Timestamp).ToList());
+            .Where(t => t.EmployeeId >= 0)
+            .GroupBy(t => t.EmployeeId)
+            .ToDictionary(g => g.Key, g => g.OrderBy(t => t.Timestamp).ToList());
 
         foreach (var legacy in employees)
         {
@@ -139,10 +146,7 @@ public sealed class TimeQPlusImporter
             preview.Employees.Add(row);
         }
 
-        var unmatched = transactions
-            .Select(t => (Badge: t.Badge, Transaction: t))
-            .Where(x => ResolveEmployeeId(x.Transaction, lookup) < 0)
-            .ToList();
+        var unmatched = transactions.Where(t => t.EmployeeId < 0).ToList();
 
         if (unmatched.Count > 0)
         {
@@ -206,6 +210,12 @@ public sealed class TimeQPlusImporter
         if (options.ToDate is not null)
             transactions = transactions.Where(t => t.Timestamp < options.ToDate.Value.Date.AddDays(1)).ToList();
 
+        var lookup = BuildEmployeeLookup(legacyEmployees);
+        var timeCardMap = BuildTimeCardEmployeeMap(db);
+        var known = legacyEmployees.Where(e => e.Employee.LegacyId is not null)
+            .Select(e => e.Employee.LegacyId!.Value).ToHashSet();
+        ResolveEmployees(transactions, lookup, timeCardMap, known);
+
         var detection = PunchDirectionDetector.Detect(transactions, options.DirectionMode);
         PunchDirectionDetector.Assign(transactions, detection);
 
@@ -219,6 +229,7 @@ public sealed class TimeQPlusImporter
                 {
                     int legacyId = row.GetInt32("ShiftID") ?? 0;
                     if (legacyId == 0) continue;
+                    if (row.GetBoolean("ShiftEnabled") != true) continue; // unused placeholder shift
 
                     var shift = MapShift(row);
                     var existing = store.FindShiftByLegacyId(legacyId);
@@ -310,6 +321,7 @@ public sealed class TimeQPlusImporter
                     var start = row.GetDateTime("PeriodStart");
                     var end = row.GetDateTime("PeriodEnd");
                     if (start is null || end is null || end < start) continue;
+                    if ((end.Value.Date - start.Value.Date).TotalDays > 45) continue; // placeholder period
 
                     var period = new PayPeriod
                     {
@@ -326,7 +338,6 @@ public sealed class TimeQPlusImporter
             // --- punches ------------------------------------------------
             if (options.ImportPunches)
             {
-                var lookup = BuildEmployeeLookup(legacyEmployees);
                 var seen = new HashSet<(int, DateTime, PunchKind)>();
                 int total = transactions.Count;
                 int index = 0;
@@ -337,7 +348,7 @@ public sealed class TimeQPlusImporter
                     if (index % 250 == 0)
                         progress?.Invoke(index, total, $"{index:n0} of {total:n0} punches");
 
-                    int legacyEmployeeId = ResolveEmployeeId(transaction, lookup);
+                    int legacyEmployeeId = transaction.EmployeeId;
                     if (legacyEmployeeId < 0 || !employeeMap.TryGetValue(legacyEmployeeId, out var employee))
                     {
                         result.UnmatchedPunches++;
@@ -350,7 +361,13 @@ public sealed class TimeQPlusImporter
                         continue;
                     }
 
-                    // Guard against importing the same punch twice on a re-run.
+                    // Guard against importing the same punch twice, whether on a re-run or
+                    // from an overlapping archive snapshot.
+                    if (store.HasPunch(employee.Id, transaction.Timestamp, transaction.Kind))
+                    {
+                        result.PunchesSkipped++;
+                        continue;
+                    }
                     if (transaction.LegacyId > 0 && store.FindPunchByLegacyId(transaction.LegacyId) is not null)
                     {
                         result.PunchesSkipped++;
@@ -513,6 +530,57 @@ public sealed class TimeQPlusImporter
         return result;
     }
 
+    /// <summary>
+    /// timeQplus links a punch to an employee through TimeCards: Transactions.TimeCardID
+    /// -> TimeCards.EmployeeID. On the PC clock the TransBadge column is left empty, so
+    /// this link is the only reliable way to attribute a punch.
+    /// </summary>
+    internal static Dictionary<int, int> BuildTimeCardEmployeeMap(Jet4Database db)
+    {
+        var map = new Dictionary<int, int>();
+        if (!db.HasTable("TimeCards")) return map;
+
+        try
+        {
+            foreach (var row in db.GetTable("TimeCards").Rows())
+            {
+                int timeCardId = row.GetInt32("TimeCardID") ?? -1;
+                int employeeId = row.GetInt32("EmployeeID") ?? -1;
+                if (timeCardId > 0 && employeeId > 0)
+                    map[timeCardId] = employeeId;
+            }
+        }
+        catch
+        {
+            // A damaged TimeCards table must not stop the import; badge matching still works.
+        }
+
+        return map;
+    }
+
+    internal static void ResolveEmployees(List<LegacyTransaction> transactions,
+        Dictionary<string, int> lookup, Dictionary<int, int> timeCardMap,
+        HashSet<int> knownEmployees)
+    {
+        foreach (var transaction in transactions)
+        {
+            int id = -1;
+
+            if (transaction.TimeCardId is int cardId &&
+                timeCardMap.TryGetValue(cardId, out int fromCard) &&
+                knownEmployees.Contains(fromCard))
+            {
+                id = fromCard;
+            }
+            else if (ResolveEmployeeId(transaction, lookup) is int fromBadge && fromBadge >= 0)
+            {
+                id = fromBadge;
+            }
+
+            transaction.EmployeeId = id;
+        }
+    }
+
     private static Dictionary<int, (DateTime Start, DateTime End)> ReadLegacyPeriods(Jet4Database db)
     {
         var map = new Dictionary<int, (DateTime, DateTime)>();
@@ -559,7 +627,7 @@ public sealed class TimeQPlusImporter
                     Pin = Clean(row.GetString("PIN")),
                     EmployeeNumber = Clean(row.GetString("Number")),
                     Message = Clean(row.GetString("Message")),
-                    HireDate = row.GetDateTime("HireDate"),
+                    HireDate = SaneDate(row.GetDateTime("HireDate")),
                     ExportId = Clean(row.GetString("ExportID")),
                     Status = status == 2 ? EmployeeStatus.Inactive : EmployeeStatus.Active,
                     Custom1 = Clean(row.GetString("Custom1")),
@@ -767,22 +835,46 @@ public sealed class TimeQPlusImporter
         // imported so that a different unit can never silently corrupt the setup.
         settings.CompanyMessage = row.GetString("CompanyMessage") ?? settings.CompanyMessage;
         settings.RoundingMinutes = SaneRounding(row.GetInt32("PayIntervalRound"));
-        settings.DailyOverTime1Minutes = SaneThreshold(row.GetInt32("DailyOT1Thresh"));
-        settings.DailyOverTime2Minutes = SaneThreshold(row.GetInt32("DailyOT2Thresh"));
-        settings.WeeklyOverTime1Minutes = SaneThreshold(row.GetInt32("WeeklyOT1Thresh"));
-        settings.WeeklyOverTime2Minutes = SaneThreshold(row.GetInt32("WeeklyOT2Thresh"));
+        settings.DailyOverTime1Minutes = SaneDailyThreshold(row.GetInt32("DailyOT1Thresh"));
+        settings.DailyOverTime2Minutes = SaneDailyThreshold(row.GetInt32("DailyOT2Thresh"));
+        settings.WeeklyOverTime1Minutes = SaneWeeklyThreshold(row.GetInt32("WeeklyOT1Thresh"));
+        settings.WeeklyOverTime2Minutes = SaneWeeklyThreshold(row.GetInt32("WeeklyOT2Thresh"));
         settings.DayChangeOffsetMinutes = SaneMinutes(row.GetInt32("DayChangeOffset"));
+
+        int maxOnClock = SaneMinutes(row.GetInt32("MaxTimeOnClock"));
+        if (maxOnClock >= 60) settings.MaxPunchSpanMinutes = maxOnClock;
     }
 
-    private static int SaneThreshold(int? value)
+    /// <summary>
+    /// timeQplus disables a daily overtime band by setting it to 24 hours (1440 minutes).
+    /// Weekly bands are disabled at 168 hours (10080 minutes).
+    /// </summary>
+    private static int SaneDailyThreshold(int? value)
     {
-        if (value is null || value < 0 || value > 24 * 60) return 0;
+        if (value is null || value < 0 || value >= 24 * 60) return 0;
         return value.Value;
     }
 
+    private static int SaneWeeklyThreshold(int? value)
+    {
+        if (value is null || value < 0 || value >= 7 * 24 * 60) return 0;
+        return value.Value;
+    }
+
+    /// <summary>
+    /// PayIntervalRound is an index/enum in the legacy schema, not a number of minutes.
+    /// Only the unambiguous, common payroll intervals are imported.
+    /// </summary>
     private static int SaneRounding(int? value)
     {
-        if (value is null || value < 0 || value > 60) return 0;
-        return value.Value;
+        if (value is null) return 0;
+        return value.Value is 5 or 6 or 10 or 15 or 20 or 30 or 60 ? value.Value : 0;
+    }
+
+    /// <summary>Access stores "no date" as the 1899 epoch; treat anything before 1900 as empty.</summary>
+    private static DateTime? SaneDate(DateTime? value)
+    {
+        if (value is null) return null;
+        return value.Value.Year <= 1900 ? null : value;
     }
 }

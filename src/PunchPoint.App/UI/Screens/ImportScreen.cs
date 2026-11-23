@@ -25,6 +25,7 @@ public sealed class ImportScreen : ScreenBase
 
     private string? _workingPath;
     private string? _csvPath;
+    private List<string>? _batchFiles;
     private readonly Label _csvSummary = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
     private readonly CheckBox _csvCreateMissing = Theme.Check("Create employees that are not found (using the badge/PIN as the name)");
     private readonly Button _csvImportButton = Theme.PrimaryButton("Import CSV punches", 170);
@@ -74,6 +75,20 @@ public sealed class ImportScreen : ScreenBase
         pathRow.Controls.Add(_path, 0, 0);
         pathRow.Controls.Add(detect, 1, 0);
         fileStack.Add(pathRow);
+
+        var folderRow = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false };
+        var chooseFolder = Theme.PrimaryButton("Import the whole Data folder (all history)…", 330);
+        chooseFolder.Click += (_, _) => ChooseFolder();
+        folderRow.Controls.Add(chooseFolder);
+        folderRow.Controls.Add(new Label
+        {
+            Text = "Recommended — brings every weekly snapshot in the Archives folder too.",
+            Font = Theme.Small,
+            ForeColor = Theme.TextMuted,
+            AutoSize = true,
+            Margin = new Padding(10, 10, 0, 0),
+        });
+        fileStack.Add(folderRow);
         fileCard.Controls.Add(fileStack);
         stack.Add(fileCard);
 
@@ -382,6 +397,64 @@ public sealed class ImportScreen : ScreenBase
                 "If the old computer is a different machine, copy the whole timeQplus folder to this PC first.");
     }
 
+    private void ChooseFolder()
+    {
+        using var dialog = new FolderBrowserDialog
+        {
+            Description = "Choose the timeQplusV3 data folder (the one containing arx_active.mdb and Archives)",
+            UseDescriptionForTitle = true,
+            ShowNewFolderButton = false,
+        };
+
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            Cursor = Cursors.WaitCursor;
+            var files = TimeQPlusFolderImporter.DiscoverDatabases(dialog.SelectedPath);
+            if (files.Count == 0)
+            {
+                PromptDialog.Warn(this, "No arx_active.mdb or Archives\\*.mdb files were found in that folder.");
+                return;
+            }
+
+            _batchFiles = files;
+            _workingPath = null;
+            _path.Text = $"{dialog.SelectedPath}  —  {files.Count} database file(s)";
+
+            var batch = TimeQPlusFolderImporter.Preview(files);
+            var active = batch.Files.LastOrDefault(f => Path.GetFileName(f.File)
+                .StartsWith("arx_active", StringComparison.OrdinalIgnoreCase));
+
+            _status.Text =
+                $"{files.Count} weekly snapshots + live database · {batch.TransactionCount:n0} punches" +
+                (batch.FirstPunch is not null
+                    ? $" · {batch.FirstPunch:MMM d, yyyy} to {batch.LastPunch:MMM d, yyyy}"
+                    : "") +
+                $"\n{batch.EmployeeCount} employees · {batch.Warnings.Count} warning(s)";
+
+            var sample = active.Preview ?? batch.Files.Last().Preview;
+            FillEmployeeGrid(sample);
+            _log.Text = batch.Warnings.Count == 0
+                ? ""
+                : "Notes:\n• " + string.Join("\n• ", batch.Warnings.Take(8));
+
+            _importButton.Enabled = batch.TransactionCount > 0;
+            _importButton.Text = "Import all history";
+        }
+        catch (Exception ex)
+        {
+            _batchFiles = null;
+            _importButton.Enabled = false;
+            _importButton.Text = "Start import";
+            PromptDialog.Warn(this, ex.Message);
+        }
+        finally
+        {
+            Cursor = Cursors.Default;
+        }
+    }
+
     private void ChooseFile()
     {
         using var dialog = new OpenFileDialog
@@ -409,7 +482,9 @@ public sealed class ImportScreen : ScreenBase
             string temp = Path.Combine(Path.GetTempPath(), $"punchpoint-legacy-{Guid.NewGuid():n}.mdb");
             File.Copy(path, temp, overwrite: true);
 
+            _batchFiles = null;
             _workingPath = temp;
+            _importButton.Text = "Start import";
             _path.Text = path + "  (read from a temporary copy)";
 
             var preview = new TimeQPlusImporter(temp).Preview();
@@ -424,19 +499,7 @@ public sealed class ImportScreen : ScreenBase
                 ? Theme.Danger
                 : Theme.TextMuted;
 
-            _employeeGrid.Rows.Clear();
-            foreach (var row in preview.Employees.OrderBy(e => e.Employee.SortName))
-            {
-                _employeeGrid.Rows.Add(
-                    row.Employee.SortName,
-                    row.Employee.Pin,
-                    row.Employee.Badge,
-                    row.PunchCount,
-                    row.FirstPunch?.ToString("MMM d, yyyy") ?? "",
-                    row.LastPunch?.ToString("MMM d, yyyy") ?? "",
-                    row.FirstDaySummary,
-                    string.Join("; ", row.Notes));
-            }
+            FillEmployeeGrid(preview);
 
             _log.Text = preview.Warnings.Count == 0
                 ? ""
@@ -463,9 +526,26 @@ public sealed class ImportScreen : ScreenBase
         }
     }
 
+    private void FillEmployeeGrid(ImportPreview preview)
+    {
+        _employeeGrid.Rows.Clear();
+        foreach (var row in preview.Employees.OrderBy(e => e.Employee.SortName))
+        {
+            _employeeGrid.Rows.Add(
+                row.Employee.SortName,
+                row.Employee.Pin,
+                row.Employee.Badge,
+                row.PunchCount,
+                row.FirstPunch?.ToString("MMM d, yyyy") ?? "",
+                row.LastPunch?.ToString("MMM d, yyyy") ?? "",
+                row.FirstDaySummary,
+                string.Join("; ", row.Notes));
+        }
+    }
+
     private async Task RunImportAsync()
     {
-        if (_workingPath is null) return;
+        if (_workingPath is null && _batchFiles is null) return;
 
         if (!PromptDialog.Confirm(this,
                 "Import now?\n\nA backup of the current database will be created first, then employees and " +
@@ -509,17 +589,49 @@ public sealed class ImportScreen : ScreenBase
         Cursor = Cursors.WaitCursor;
 
         string dbPath = Services.Store.Db.Path;
-        string source = _workingPath;
+        string? source = _workingPath;
+        List<string>? batchFiles = _batchFiles;
 
         try
         {
             var progress = new Progress<string>(message => _log.Text = message);
 
+            if (batchFiles is not null)
+            {
+                var batch = await Task.Run(() =>
+                {
+                    using var database = Database.Open(dbPath);
+                    var store = new Store(database);
+                    return TimeQPlusFolderImporter.Import(store, batchFiles, options,
+                        (done, total, message) => ((IProgress<string>)progress).Report(message));
+                });
+
+                Services.NotifyDataChanged();
+
+                _log.Text =
+                    $"Done in {batch.Duration.TotalSeconds:0.0}s — {batch.FilesImported} files, " +
+                    $"{batch.EmployeesAdded} employees added, {batch.PunchesAdded:n0} punches" +
+                    (batch.PunchesSkipped > 0 ? $", {batch.PunchesSkipped:n0} already present" : "") +
+                    (batch.UnmatchedPunches > 0 ? $", {batch.UnmatchedPunches:n0} unmatched" : "") + "\n" +
+                    $"Backup: {backup}";
+
+                PromptDialog.Info(this,
+                    "History import finished.\n\n" +
+                    $"Files: {batch.FilesImported} of {batchFiles.Count}\n" +
+                    $"Employees added: {batch.EmployeesAdded}\n" +
+                    $"Punches: {batch.PunchesAdded:n0}\n" +
+                    $"Skipped (already there): {batch.PunchesSkipped:n0}\n" +
+                    $"Unmatched punches: {batch.UnmatchedPunches:n0}\n\n" +
+                    "Open Time Cards to review the hours. Use the Settings → Show inactive option to " +
+                    "see former employees.");
+                return;
+            }
+
             var result = await Task.Run(() =>
             {
                 using var database = Database.Open(dbPath);
                 var store = new Store(database);
-                return new TimeQPlusImporter(source).Import(store, options,
+                return new TimeQPlusImporter(source!).Import(store, options,
                     (done, total, message) => ((IProgress<string>)progress).Report(message));
             });
 

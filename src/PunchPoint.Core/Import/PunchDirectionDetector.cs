@@ -65,7 +65,7 @@ public static class PunchDirectionDetector
         }
 
         var sequences = punches
-            .GroupBy(t => t.Badge, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(GroupKey)
             .Select(g => g.OrderBy(t => t.Timestamp).ToList())
             .Where(s => s.Count > 1)
             .ToList();
@@ -178,7 +178,7 @@ public static class PunchDirectionDetector
     /// </summary>
     private static void AssignAlternating(List<LegacyTransaction> punches)
     {
-        foreach (var group in punches.GroupBy(t => t.Badge, StringComparer.OrdinalIgnoreCase))
+        foreach (var group in punches.GroupBy(GroupKey))
         {
             bool expectingIn = true;
             DateTime? openIn = null;
@@ -212,6 +212,13 @@ public static class PunchDirectionDetector
     }
 
     internal static bool IsMiscHours(LegacyTransaction t) => t.Hours > 0;
+
+    /// <summary>
+    /// Groups punches per person. The resolved employee id is authoritative (the PC clock
+    /// leaves TransBadge empty and links through TimeCardID); the badge is a fallback.
+    /// </summary>
+    private static string GroupKey(LegacyTransaction t) =>
+        t.EmployeeId >= 0 ? "e:" + t.EmployeeId : "b:" + (t.Badge ?? "").Trim().ToLowerInvariant();
 
     private static double FlipScore(IEnumerable<List<LegacyTransaction>> sequences, Func<LegacyTransaction, int> selector)
     {

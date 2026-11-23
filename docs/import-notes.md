@@ -51,6 +51,39 @@ TQDevices, TQUsers, TQUserTemplates, EventLog, Export, Version
 `Transactions` holds **every terminal event in one table**. There is no "direction"
 column with an obvious name.
 
+## What a PC-clock installation actually looks like
+
+These details were confirmed against a live installation (13 employees, 4.5 years of
+history):
+
+* **`TransBadge` is empty on every punch.** The employee is linked through
+  `Transactions.TimeCardID` → `TimeCards.EmployeeID`. PunchPoint resolves this first and
+  only falls back to badge/PIN matching when the time card link is missing.
+* `TransType`, `TransSource` and `TransState` are constant (1, 1, 0) — there is no
+  direction information at all, so punches alternate.
+* Employees have **no badge**, only a 4-digit PIN, sometimes with a leading zero
+  (`0744`). PIN entry accepts both `0744` and `744`.
+* `HireDate` is the 1899 epoch when unset; it is imported as empty.
+* All 12 shifts are disabled placeholders dated 1899; they are skipped, so no grace,
+  docking or lunch rules are applied.
+* `Setup` disables daily overtime by storing `1440` (24 h) and disables weekly
+  double-time with `10080` (168 h). `WeeklyOT1Thresh = 2400` (40 h) is imported as the
+  weekly overtime threshold.
+* `PayIntervalRound` is an enum, not a number of minutes; only the unambiguous
+  intervals (5, 6, 10, 15, 20, 30, 60) are imported, anything else means "no rounding".
+* One pay period in the live file spans three months. Periods longer than 45 days are
+  treated as placeholders and replaced by generated periods of the real type.
+
+### Archives
+
+`Data\Archives\arxMMDDYY.mdb` holds one weekly snapshot per file. They do not overlap,
+and `TransactionID` increases across files. PunchPoint can import the whole folder at
+once (oldest first, live database last). A punch is skipped only when the same employee
+already has a punch at the same timestamp with the same type, so re-running is harmless.
+
+A full import of 247 snapshots (28,465 punches, 31 employees including former staff)
+takes under two seconds.
+
 ## How IN and OUT are worked out
 
 The old app has to decide, for each punch, whether it is an IN or an OUT. Three

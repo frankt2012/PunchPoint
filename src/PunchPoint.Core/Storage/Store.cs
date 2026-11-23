@@ -151,9 +151,33 @@ public sealed class Store
     public Employee? GetEmployee(int id) =>
         _db.Query("SELECT * FROM employees WHERE id = $id;", MapEmployee, ("$id", id)).FirstOrDefault();
 
-    public Employee? FindByPin(string pin) =>
-        string.IsNullOrWhiteSpace(pin) ? null :
-        _db.Query("SELECT * FROM employees WHERE pin = $pin AND status = 0;", MapEmployee, ("$pin", pin.Trim())).FirstOrDefault();
+    public Employee? FindByPin(string pin)
+    {
+        if (string.IsNullOrWhiteSpace(pin)) return null;
+        string trimmed = pin.Trim();
+
+        var exact = _db.Query("SELECT * FROM employees WHERE pin = $pin AND status = 0;",
+            MapEmployee, ("$pin", trimmed)).FirstOrDefault();
+        if (exact is not null) return exact;
+
+        // Employees imported from timeQplus often have PINs stored with leading zeros
+        // ("0744"). Accept both forms, but only when the match is unambiguous.
+        if (!trimmed.All(char.IsDigit)) return null;
+
+        string normalized = trimmed.TrimStart('0');
+        if (normalized.Length == 0) normalized = "0";
+
+        var candidates = _db.Query("SELECT * FROM employees WHERE status = 0;", MapEmployee)
+            .Where(e => e.Pin.Length > 0 && e.Pin.All(char.IsDigit))
+            .Where(e =>
+            {
+                string p = e.Pin.TrimStart('0');
+                return (p.Length == 0 ? "0" : p) == normalized;
+            })
+            .ToList();
+
+        return candidates.Count == 1 ? candidates[0] : null;
+    }
 
     public Employee? FindByBadge(string badge) =>
         string.IsNullOrWhiteSpace(badge) ? null :
@@ -405,6 +429,13 @@ public sealed class Store
 
     public Punch? FindPunchByLegacyId(int legacyId) =>
         _db.Query("SELECT * FROM punches WHERE legacy_id = $id LIMIT 1;", MapPunch, ("$id", legacyId)).FirstOrDefault();
+
+    /// <summary>True when this exact punch has already been stored (used to make imports idempotent).</summary>
+    public bool HasPunch(int employeeId, DateTime timestamp, PunchKind kind) =>
+        Convert.ToInt32(_db.Scalar("""
+            SELECT COUNT(*) FROM punches
+            WHERE employee_id = $emp AND timestamp = $ts AND kind = $kind;
+            """, ("$emp", employeeId), ("$ts", Format(timestamp)), ("$kind", (int)kind))) > 0;
 
     public void AssignPunchesToPeriod(int payPeriodId, DateTime start, DateTime end)
     {
