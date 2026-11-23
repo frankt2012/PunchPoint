@@ -1,286 +1,237 @@
+using System.Text;
 using PunchPoint.App.UI;
-using PunchPoint.Core.Export;
 using PunchPoint.Core.Models;
-using PunchPoint.Core.TimeCalc;
+using PunchPoint.Core.Reports;
 
 namespace PunchPoint.App.UI.Screens;
 
+/// <summary>
+/// Reports, following the old timeQplus layout: choose a report on the left, choose a pay
+/// period and an employee filter, then preview, print or export.
+/// </summary>
 public sealed class ReportsScreen : ScreenBase
 {
-    private readonly ComboBox _periods = Theme.Dropdown(300);
+    private static readonly (string Name, string Hint)[] Catalog =
+    {
+        ("Time Card", "Punches and totals for one employee"),
+        ("Hours Summary", "Regular, overtime and holiday hours per employee"),
+        ("Daily Totals By Day", "Every employee's totals, grouped by date"),
+        ("Daily Totals By Employee", "Every employee's totals, grouped by employee"),
+        ("Raw Transactions", "Every punch exactly as recorded"),
+        ("Time Card Approvals", "Time cards still waiting for approval"),
+        ("Employee Profiles", "Names, PINs, badges, shifts and status"),
+        ("Shifts", "Shift rules and lunch settings"),
+        ("Holidays", "Paid holidays for the year"),
+        ("Rules Setup", "Overtime, rounding and period rules"),
+    };
+
+    private readonly ListBox _list = new();
+    private readonly ComboBox _periods = Theme.Dropdown(240);
+    private readonly ComboBox _employeeFilter = Theme.Dropdown(220);
     private readonly DataGridView _grid = new();
-    private readonly Label _summary = new() { AutoSize = true, Font = Theme.Body, ForeColor = Theme.TextMuted };
-    private List<PayPeriod> _loaded = new();
+    private readonly Label _summary = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
+
+    private List<PayPeriod> _loadedPeriods = new();
+    private List<Employee> _employees = new();
+    private ReportTable? _table;
 
     public ReportsScreen(AppServices services)
-        : base(services, "Reports", "Exports and printable summaries")
+        : base(services, "Reports", "Preview, print or export")
     {
-        _periods.Margin = new Padding(0, 8, 0, 0);
-        _periods.SelectedIndexChanged += (_, _) => LoadPreview();
+        _periods.Margin = new Padding(0, 8, 8, 0);
+        _periods.SelectedIndexChanged += (_, _) => Build();
         Actions.Controls.Add(_periods);
 
-        var stack = new StackPanel(14);
-        Body.Controls.Add(stack);
+        _employeeFilter.Margin = new Padding(0, 8, 8, 0);
+        _employeeFilter.SelectedIndexChanged += (_, _) => Build();
+        Actions.Controls.Add(_employeeFilter);
 
-        var exportCard = Theme.Card();
-        var exportStack = new StackPanel(10);
-        exportStack.Add(new Label
+        var print = Theme.SecondaryButton("Print", 80);
+        print.Margin = new Padding(0, 5, 6, 0);
+        print.Click += (_, _) => PrintReport();
+        Actions.Controls.Add(print);
+
+        var export = Theme.PrimaryButton("Export CSV", 120);
+        export.Margin = new Padding(0, 5, 0, 0);
+        export.Click += (_, _) => ExportReport();
+        Actions.Controls.Add(export);
+
+        var split = new TableLayoutPanel
         {
-            Text = "Export",
-            Font = Theme.H3,
-            ForeColor = Theme.Text,
-            AutoSize = true,
-        });
-        exportStack.Add(new Label
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 1,
+            Margin = new Padding(0),
+        };
+        split.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 260));
+        split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+        var listCard = new Panel
         {
-            Text = "Files open in Excel, Numbers or Google Sheets. Use the payroll summary for your payroll " +
-                   "provider, and the daily detail when you need to check individual days.",
-            Font = Theme.Small,
-            ForeColor = Theme.TextMuted,
-            AutoSize = true,
-            MaximumSize = new Size(800, 0),
-        });
+            Dock = DockStyle.Fill,
+            BackColor = Theme.Surface,
+            Padding = new Padding(12),
+            Margin = new Padding(0, 0, 12, 0),
+        };
+        _list.Dock = DockStyle.Fill;
+        _list.BorderStyle = BorderStyle.None;
+        _list.Font = new Font(Theme.Family, 10.5f);
+        _list.IntegralHeight = false;
+        foreach (var (name, _) in Catalog) _list.Items.Add(name);
+        _list.SelectedIndexChanged += (_, _) => Build();
+        listCard.Controls.Add(_list);
+        split.Controls.Add(listCard, 0, 0);
 
-        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false };
-        var payroll = Theme.PrimaryButton("Payroll summary (CSV)", 190);
-        payroll.Click += (_, _) => ExportPayroll();
-        var daily = Theme.SecondaryButton("Daily detail (CSV)", 160);
-        daily.Click += (_, _) => ExportDaily();
-        var punches = Theme.SecondaryButton("All punches (CSV)", 160);
-        punches.Click += (_, _) => ExportPunches();
-        var print = Theme.SecondaryButton("Print all time cards", 170);
-        print.Click += (_, _) => PrintAll();
-        buttons.Controls.Add(payroll);
-        buttons.Controls.Add(daily);
-        buttons.Controls.Add(punches);
-        buttons.Controls.Add(print);
-        exportStack.Add(buttons);
-        exportCard.Controls.Add(exportStack);
-        stack.Add(exportCard);
-
-        var previewCard = Theme.Card(0);
-        previewCard.Height = 440;
-        previewCard.AutoSize = false;
-
-        var previewHeader = new Panel { Dock = DockStyle.Top, Height = 66, Padding = new Padding(18, 14, 18, 0) };
-        previewHeader.Controls.Add(new Label
-        {
-            Text = "Period summary",
-            Font = Theme.H3,
-            ForeColor = Theme.Text,
-            AutoSize = true,
-            Location = new Point(16, 12),
-        });
-        _summary.Location = new Point(18, 40);
-        previewHeader.Controls.Add(_summary);
+        var previewCard = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Surface, Padding = new Padding(14) };
 
         Theme.StyleGrid(_grid);
-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Employee", FillWeight = 190 });
-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Regular", FillWeight = 80 });
-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "OT1", FillWeight = 70 });
-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "OT2", FillWeight = 70 });
-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Holiday", FillWeight = 70 });
-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Total", FillWeight = 80 });
-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Approved", FillWeight = 80 });
-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Notes", FillWeight = 220 });
 
-        var host = new Panel { Dock = DockStyle.Fill, Padding = new Padding(18, 0, 18, 16) };
-        host.Controls.Add(_grid);
+        var bottom = new Panel { Dock = DockStyle.Bottom, Height = 30, Padding = new Padding(2, 8, 0, 0) };
+        bottom.Controls.Add(_summary);
 
-        previewCard.Controls.Add(host);
-        previewCard.Controls.Add(previewHeader);
-        stack.Add(previewCard);
+        previewCard.Controls.Add(_grid);
+        previewCard.Controls.Add(bottom);
+        split.Controls.Add(previewCard, 1, 0);
+
+        Body.Controls.Add(split);
+        _list.SelectedIndex = 0;
     }
 
     public override void RefreshData()
     {
-        _loaded = Services.Store.ListPayPeriods().OrderByDescending(p => p.Start).ToList();
+        _loadedPeriods = Services.Store.ListPayPeriods().OrderByDescending(p => p.Start).ToList();
+        _employees = Services.Store.ListEmployees(includeInactive: true).OrderBy(e => e.SortName).ToList();
+
         var current = Services.Store.GetCurrentPayPeriod();
-        int select = current is null ? 0 : Math.Max(0, _loaded.FindIndex(p => p.Id == current.Id));
+        int periodIndex = current is null ? 0 : Math.Max(0, _loadedPeriods.FindIndex(p => p.Id == current.Id));
 
         _periods.Items.Clear();
-        foreach (var period in _loaded)
-            _periods.Items.Add($"{period.Start:MMM d} – {period.End:MMM d, yyyy}  ({period.Type})");
+        foreach (var period in _loadedPeriods)
+            _periods.Items.Add($"{period.Start:MMM d} – {period.End:MMM d, yyyy}");
 
-        if (_loaded.Count > 0) _periods.SelectedIndex = select;
-        LoadPreview();
+        _employeeFilter.Items.Clear();
+        _employeeFilter.Items.Add("All employees");
+        foreach (var employee in _employees) _employeeFilter.Items.Add(employee.SortName);
+
+        if (_loadedPeriods.Count > 0) _periods.SelectedIndex = periodIndex;
+        if (_employeeFilter.Items.Count > 0) _employeeFilter.SelectedIndex = 0;
+
+        Build();
     }
 
-    private PayPeriod? CurrentPeriod =>
-        _periods.SelectedIndex >= 0 && _periods.SelectedIndex < _loaded.Count ? _loaded[_periods.SelectedIndex] : null;
+    private PayPeriod? Period =>
+        _periods.SelectedIndex >= 0 && _periods.SelectedIndex < _loadedPeriods.Count
+            ? _loadedPeriods[_periods.SelectedIndex]
+            : null;
 
-    private void LoadPreview()
+    private Employee? FilterEmployee =>
+        _employeeFilter.SelectedIndex > 0 && _employeeFilter.SelectedIndex - 1 < _employees.Count
+            ? _employees[_employeeFilter.SelectedIndex - 1]
+            : null;
+
+    private string SelectedReport =>
+        _list.SelectedIndex >= 0 && _list.SelectedIndex < Catalog.Length ? Catalog[_list.SelectedIndex].Name : Catalog[0].Name;
+
+    private void Build()
     {
-        var period = CurrentPeriod;
-        _grid.Rows.Clear();
-        if (period is null)
+        if (_periods.Items.Count == 0) return;
+
+        var period = Period;
+        var store = Services.Store;
+        var settings = Services.Settings;
+        var employee = FilterEmployee ?? _employees.FirstOrDefault();
+
+        _table = SelectedReport switch
         {
-            _summary.Text = "No pay periods yet.";
+            "Time Card" => employee is null || period is null ? null
+                : ReportBuilder.TimeCard(store, employee, period, settings),
+            "Hours Summary" => period is null ? null
+                : ReportBuilder.HoursSummary(store, period, settings, _employees),
+            "Daily Totals By Day" => period is null ? null
+                : ReportBuilder.DailyTotals(store, period, settings, _employees, byEmployee: false),
+            "Daily Totals By Employee" => period is null ? null
+                : ReportBuilder.DailyTotals(store, period, settings, _employees, byEmployee: true),
+            "Raw Transactions" => period is null ? null
+                : ReportBuilder.RawTransactions(store, period),
+            "Time Card Approvals" => period is null ? null
+                : ReportBuilder.Unapproved(store, period, settings, _employees),
+            "Employee Profiles" => ReportBuilder.EmployeeProfiles(store),
+            "Shifts" => ReportBuilder.Shifts(store),
+            "Holidays" => ReportBuilder.Holidays(store),
+            "Rules Setup" => ReportBuilder.Rules(store),
+            _ => null,
+        };
+
+        _grid.Rows.Clear();
+        _grid.Columns.Clear();
+
+        if (_table is null)
+        {
+            _summary.Text = "Nothing to show for this selection.";
             return;
         }
 
-        var rows = CsvExporter.BuildRows(Services.Store, period, Services.Settings);
-        int total = 0;
+        foreach (string column in _table.Columns)
+            _grid.Columns.Add(new DataGridViewTextBoxColumn
+            {
+                HeaderText = column,
+                FillWeight = 100,
+                SortMode = DataGridViewColumnSortMode.NotSortable,
+            });
 
-        foreach (var row in rows)
-        {
-            total += row.Result.TotalMinutes;
-            int index = _grid.Rows.Add(
-                row.Employee.SortName,
-                Fmt.Hours(row.Result.RegularMinutes),
-                Fmt.HoursOrDash(row.Result.OverTime1Minutes),
-                Fmt.HoursOrDash(row.Result.OverTime2Minutes),
-                Fmt.HoursOrDash(row.Result.HolidayMinutes),
-                Fmt.Hours(row.Result.TotalMinutes),
-                row.Approved ? "Yes" : "",
-                row.Result.Issues.Count > 0 ? $"{row.Result.Issues.Count} punch issue(s)" : "");
+        foreach (var row in _table.Rows)
+            _grid.Rows.Add(row.ToArray());
 
-            if (row.Result.Issues.Count > 0)
-                _grid.Rows[index].Cells[7].Style.ForeColor = Theme.Warning;
-        }
-
-        _summary.Text = $"{rows.Count} employees · {Fmt.Hours(total)} hours total";
+        _summary.Text = $"{_table.Rows.Count} row(s) · {_table.Title}";
     }
 
-    private void ExportPayroll()
+    private void PrintReport()
     {
-        var period = CurrentPeriod;
-        if (period is null) return;
+        if (_table is null) return;
 
-        using var dialog = new SaveFileDialog
-        {
-            Filter = "CSV file (*.csv)|*.csv",
-            FileName = $"payroll-{period.Start:yyyy-MM-dd}.csv",
-            Title = "Save payroll summary",
-        };
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
-
-        var rows = CsvExporter.BuildRows(Services.Store, period, Services.Settings);
-        if (!ConfirmUnapproved(rows)) return;
-        CsvExporter.WritePayrollSummary(rows, dialog.FileName);
-        OfferOpen(dialog.FileName);
-    }
-
-    private bool ConfirmUnapproved(List<TimeCardExportRow> rows)
-    {
-        if (!Services.Settings.RequireApprovalBeforeExport) return true;
-
-        int unapproved = rows.Count(r => !r.Approved);
-        if (unapproved == 0) return true;
-
-        return PromptDialog.Confirm(this,
-            $"{unapproved} of {rows.Count} time cards in this period are not approved. Export anyway?");
-    }
-
-    private void ExportDaily()
-    {
-        var period = CurrentPeriod;
-        if (period is null) return;
-
-        using var dialog = new SaveFileDialog
-        {
-            Filter = "CSV file (*.csv)|*.csv",
-            FileName = $"daily-{period.Start:yyyy-MM-dd}.csv",
-            Title = "Save daily detail",
-        };
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
-
-        var rows = CsvExporter.BuildRows(Services.Store, period, Services.Settings);
-        CsvExporter.WriteDailyDetail(rows, dialog.FileName);
-        OfferOpen(dialog.FileName);
-    }
-
-    private void ExportPunches()
-    {
-        var period = CurrentPeriod;
-        if (period is null) return;
-
-        using var dialog = new SaveFileDialog
-        {
-            Filter = "CSV file (*.csv)|*.csv",
-            FileName = $"punches-{period.Start:yyyy-MM-dd}.csv",
-            Title = "Save punches",
-        };
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
-
-        CsvExporter.WritePunches(Services.Store, period.Start, period.End.AddDays(1), dialog.FileName);
-        OfferOpen(dialog.FileName);
-    }
-
-    private void PrintAll()
-    {
-        var period = CurrentPeriod;
-        if (period is null) return;
-
-        var document = new MultiTimeCardPrintDocument(Services, period);
         using var preview = new PrintPreviewDialog
         {
-            Document = document,
+            Document = new TablePrintDocument(_table, Services.Settings.CompanyName),
             Width = 1000,
             Height = 760,
-            Text = $"Time cards — {period.Label}",
+            Text = _table.Title,
         };
         preview.ShowDialog(this);
     }
 
-    private void OfferOpen(string path)
+    private void ExportReport()
     {
-        if (PromptDialog.Confirm(this, "Export finished.\n\nOpen the file now?"))
+        if (_table is null) return;
+
+        using var dialog = new SaveFileDialog
         {
-            try
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = path,
-                    UseShellExecute = true,
-                });
-            }
-            catch (Exception ex)
-            {
-                PromptDialog.Warn(this, ex.Message);
-            }
-        }
-    }
-}
+            Filter = "CSV file (*.csv)|*.csv",
+            FileName = SafeFileName(_table.Title) + ".csv",
+            Title = "Export report",
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
 
-/// <summary>Prints a time card per employee, one after another.</summary>
-public sealed class MultiTimeCardPrintDocument : System.Drawing.Printing.PrintDocument
-{
-    private readonly AppServices _services;
-    private readonly PayPeriod _period;
-    private readonly List<TimeCardResult> _cards = new();
-    private int _index;
+        var sb = new StringBuilder();
+        sb.AppendLine(string.Join(",", _table.Columns.Select(Csv)));
+        foreach (var row in _table.Rows)
+            sb.AppendLine(string.Join(",", row.Select(Csv)));
 
-    public MultiTimeCardPrintDocument(AppServices services, PayPeriod period)
-    {
-        _services = services;
-        _period = period;
-        DocumentName = $"Time cards {period.Label}";
-        DefaultPageSettings.Margins = new System.Drawing.Printing.Margins(60, 60, 60, 60);
-
-        foreach (var employee in services.Store.ListEmployees(includeInactive: true))
-        {
-            var punches = services.Store.ListPunches(employee.Id, period.Start, period.End.AddDays(1));
-            if (punches.Count == 0) continue;
-
-            var shift = employee.ShiftId is int id ? services.Store.GetShift(id) : null;
-            _cards.Add(TimeCardCalculator.Calculate(employee, shift, period, punches, services.Settings,
-                services.Store.ListHolidays(), services.Store.GetTimeCard(employee.Id, period.Id)));
-        }
+        File.WriteAllText(dialog.FileName, sb.ToString(), new UTF8Encoding(true));
+        PromptDialog.Info(this, "Exported to\n" + dialog.FileName);
     }
 
-    protected override void OnPrintPage(System.Drawing.Printing.PrintPageEventArgs e)
+    private static string SafeFileName(string title)
     {
-        if (_index >= _cards.Count)
-        {
-            e.HasMorePages = false;
-            return;
-        }
+        foreach (char bad in Path.GetInvalidFileNameChars())
+            title = title.Replace(bad, '-');
+        return title.Replace(' ', '-').ToLowerInvariant();
+    }
 
-        var single = new TimeCardPrintDocument(_services.Settings, _cards[_index]);
-        bool complete = single.DrawPage(e.Graphics!, e.MarginBounds);
-
-        if (complete) _index++;
-        e.HasMorePages = _index < _cards.Count;
+    private static string Csv(string? value)
+    {
+        value ??= "";
+        return value.Contains(',') || value.Contains('"') || value.Contains('\n')
+            ? "\"" + value.Replace("\"", "\"\"") + "\""
+            : value;
     }
 }

@@ -307,3 +307,59 @@ public class TimeCardCalculatorTests
         Assert.Equal(510, result.TotalMinutes);
     }
 }
+
+public class SeventhDayOvertimeTests
+{
+    [Fact]
+    public void Seventh_consecutive_day_is_all_overtime_when_enabled()
+    {
+        var settings = new AppSettings { EnableSeventhDayOvertime = true };
+        var period = new PayPeriod
+        {
+            Start = new DateTime(2026, 11, 9),
+            End = new DateTime(2026, 11, 15),
+            Type = PayPeriodType.Weekly,
+        };
+        var employee = new Employee { Id = 1, FirstName = "Seven", LastName = "Days", Pin = "1" };
+
+        var punches = new List<Punch>();
+        for (int day = 0; day < 7; day++)
+        {
+            var date = period.Start.AddDays(day);
+            punches.Add(new Punch { EmployeeId = 1, Timestamp = date.AddHours(8), Kind = PunchKind.In });
+            punches.Add(new Punch { EmployeeId = 1, Timestamp = date.AddHours(16), Kind = PunchKind.Out });
+        }
+
+        var result = TimeCardCalculator.Calculate(employee, null, period, punches, settings);
+
+        Assert.Equal(6 * 480, result.RegularMinutes);
+        Assert.Equal(480, result.OverTime1Minutes);
+        Assert.Equal(480, result.Days.Last().OverTime1Minutes);
+    }
+
+    [Fact]
+    public void Seventh_day_is_regular_when_the_option_is_off()
+    {
+        var settings = new AppSettings { EnableSeventhDayOvertime = false };
+        var period = new PayPeriod
+        {
+            Start = new DateTime(2026, 11, 9),
+            End = new DateTime(2026, 11, 15),
+            Type = PayPeriodType.Weekly,
+        };
+        var employee = new Employee { Id = 1, FirstName = "Seven", LastName = "Days", Pin = "1" };
+
+        var punches = new List<Punch>();
+        for (int day = 0; day < 7; day++)
+        {
+            var date = period.Start.AddDays(day);
+            punches.Add(new Punch { EmployeeId = 1, Timestamp = date.AddHours(8), Kind = PunchKind.In });
+            punches.Add(new Punch { EmployeeId = 1, Timestamp = date.AddHours(16), Kind = PunchKind.Out });
+        }
+
+        var result = TimeCardCalculator.Calculate(employee, null, period, punches, settings);
+
+        Assert.Equal(7 * 480, result.RegularMinutes);
+        Assert.Equal(0, result.OverTime1Minutes);
+    }
+}

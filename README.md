@@ -22,6 +22,33 @@ PunchPoint is a standalone Windows app that:
 * gives you honest, explainable time cards: every adjustment (rounding, grace, docking,
   lunch, overtime) is shown in plain English.
 
+## Open source
+
+PunchPoint is MIT licensed (see [LICENSE](LICENSE)) — it is your app to keep, modify and
+share. It contains no code from the original timeQplus software: the Access reader and all
+behaviour were written from scratch (see [NOTICE.md](NOTICE.md)).
+
+## Like the old app, but modern
+
+| timeQplus screen | PunchPoint |
+|---|---|
+| Home | **Dashboard** — who is on the clock, hours this period, punch problems |
+| Employees | **Employees** — same fields (name, badge, PIN, number, shift, hire date) plus pay type |
+| Messages | **Messages** — company message and per-employee messages |
+| Setup | **Settings** — pay periods, rounding, overtime, day change, approvals, 7th-day OT |
+| Shifts | **Settings → Shifts** — start/stop, round, grace, dock, lunch, holiday hours |
+| Punch Editing | **Punch Editing** — employee + period, every punch with day totals, insert/delete/edit, totals, approve |
+| Reports | **Reports** — ten reports with period and employee filters, preview, print, export |
+| Export | **Export** — payroll, generic ASCII, daily detail, raw punches, QuickBooks-friendly |
+| Terminal | **Import** — reads the old timeQplus database and archives |
+| Employee Transaction | **PunchPointClock.exe** — a locked-down full-screen clock |
+
+Quality-of-life additions over the original: automatic daily and pre-import backups, import
+that reads the old database directly (no Access/JET needed), one-click history import from
+the Archives folder, plain-English explanations of every adjustment, password-protected
+admin app, kiosk clock that employees cannot leave, CSV export everywhere, and a
+self-contained executable with no runtime to install.
+
 ## What it does
 
 | Area | |
@@ -29,10 +56,12 @@ PunchPoint is a standalone Windows app that:
 | **Clock** | Big PIN pad, clock in/out, optional unpaid breaks, recent activity, auto-return |
 | **Dashboard** | Who is on the clock now, hours this period, punch problems |
 | **Employees** | Profiles, PIN/badge, shift assignment, pay type and rate, active/inactive |
-| **Time Cards** | Per-employee, per-period totals, day-by-day breakdown, corrections, approval |
+| **Messages** | Company-wide and per-employee messages shown on the clock |
+| **Punch Editing** | Per-employee, per-period punches, corrections, totals, approval |
 | **Punches** | Every raw clock event, editable, with audit trail |
 | **Import** | Reads timeQplus `arx_active.mdb` directly; previews before writing |
-| **Reports** | Payroll CSV, daily detail CSV, punch CSV, printable time cards |
+| **Reports** | Ten reports with preview, print and CSV export |
+| **Export** | Payroll, generic ASCII, daily detail, punches, QuickBooks-friendly files |
 | **Settings** | Pay periods, rounding, overtime, day-change, shifts, holidays, backups |
 
 ## Two programs

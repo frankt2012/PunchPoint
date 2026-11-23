@@ -22,10 +22,12 @@ public sealed class MainForm : Form
         ("clock", "Open clock", false),
         ("dashboard", "Dashboard", false),
         ("employees", "Employees", true),
-        ("timecards", "Time Cards", true),
+        ("messages", "Messages", true),
+        ("timecards", "Punch Editing", true),
         ("punches", "Punches", true),
         ("import", "Import", true),
         ("reports", "Reports", true),
+        ("export", "Export", true),
         ("settings", "Settings", true),
     };
 
@@ -201,10 +203,12 @@ public sealed class MainForm : Form
             {
                 "dashboard" => new DashboardScreen(_services),
                 "employees" => new EmployeesScreen(_services),
+                "messages" => new MessagesScreen(_services),
                 "timecards" => new TimeCardsScreen(_services),
                 "punches" => new PunchesScreen(_services),
                 "import" => new ImportScreen(_services),
                 "reports" => new ReportsScreen(_services),
+                "export" => new ExportScreen(_services),
                 "settings" => new SettingsScreen(_services),
                 _ => new DashboardScreen(_services),
             };

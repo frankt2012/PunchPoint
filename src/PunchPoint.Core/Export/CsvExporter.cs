@@ -175,6 +175,53 @@ public static class CsvExporter
         File.WriteAllText(path, sb.ToString(), new UTF8Encoding(true));
     }
 
+    /// <summary>
+    /// Old-style "Generic ASCII" payroll file: one line per employee with profile and hours,
+    /// configurable separator, quoting and header (mirrors the timeQplus export options).
+    /// </summary>
+    public static void WriteGenericAscii(IEnumerable<TimeCardExportRow> rows, string path, ExportOptions? options = null)
+    {
+        options ??= new ExportOptions();
+        var sb = new StringBuilder();
+
+        void Line(IEnumerable<string> fields) =>
+            sb.Append(string.Join(options.FieldSeparator, fields.Select(f => Field(f, options))))
+              .Append(options.LineTerminator);
+
+        if (options.IncludeHeader)
+        {
+            var headers = new List<string>();
+            if (options.IncludeEmployeeInfo)
+                headers.AddRange(new[] { "Number", "Last Name", "First Name", "Badge", "PIN" });
+            headers.AddRange(new[] { "Regular", "Overtime 1", "Overtime 2", "Holiday", "Total" });
+            Line(headers);
+        }
+
+        foreach (var row in rows)
+        {
+            if (options.ApprovedOnly && !row.Approved) continue;
+
+            var fields = new List<string>();
+            if (options.IncludeEmployeeInfo)
+            {
+                fields.Add(row.Employee.EmployeeNumber);
+                fields.Add(row.Employee.LastName);
+                fields.Add(row.Employee.FirstName);
+                fields.Add(row.Employee.Badge);
+                fields.Add(row.Employee.Pin);
+            }
+
+            fields.Add(row.FormatHours(row.Result.RegularMinutes, options.DecimalHours));
+            fields.Add(row.FormatHours(row.Result.OverTime1Minutes, options.DecimalHours));
+            fields.Add(row.FormatHours(row.Result.OverTime2Minutes, options.DecimalHours));
+            fields.Add(row.FormatHours(row.Result.HolidayMinutes, options.DecimalHours));
+            fields.Add(row.FormatHours(row.Result.TotalMinutes, options.DecimalHours));
+            Line(fields);
+        }
+
+        File.WriteAllText(path, sb.ToString(), new UTF8Encoding(true));
+    }
+
     private static string Field(string? value, ExportOptions options)
     {
         value ??= "";

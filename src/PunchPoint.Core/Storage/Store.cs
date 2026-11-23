@@ -65,6 +65,9 @@ public sealed class Store
             MaxPunchSpanMinutes = r.GetInt("max_punch_span", 960),
             RequireApprovalBeforeExport = r.GetBool("require_approval"),
             RoundDailyTotalInsteadOfPunches = r.GetBool("round_daily_total"),
+            TotalsFormat = r.HasColumn("totals_format") ? (TotalsFormat)r.GetInt("totals_format", 1) : TotalsFormat.Hundredths,
+            ShowPunchCommentDialog = !r.HasColumn("show_punch_comment") || r.GetBool("show_punch_comment", true),
+            EnableSeventhDayOvertime = r.HasColumn("enable_7th_day_ot") && r.GetBool("enable_7th_day_ot"),
             TimeFormat = r.GetStringOrNull("time_format") ?? "h:mm tt",
             DateFormat = r.GetStringOrNull("date_format") ?? "M/d/yyyy",
             LastBackupPath = r.GetStringOrNull("last_backup_path") ?? "",
@@ -86,6 +89,8 @@ public sealed class Store
                 day_change_offset = $offset, max_punch_span = $span,
                 require_approval = $approval, round_daily_total = $dailyTotal,
                 time_format = $timeFormat, date_format = $dateFormat,
+                totals_format = $totalsFormat, show_punch_comment = $showComment,
+                enable_7th_day_ot = $seventhDay,
                 last_backup_path = $backup
             WHERE id = 1;
             """,
@@ -100,6 +105,9 @@ public sealed class Store
             ("$approval", s.RequireApprovalBeforeExport ? 1 : 0),
             ("$dailyTotal", s.RoundDailyTotalInsteadOfPunches ? 1 : 0),
             ("$timeFormat", s.TimeFormat), ("$dateFormat", s.DateFormat),
+            ("$totalsFormat", (int)s.TotalsFormat),
+            ("$showComment", s.ShowPunchCommentDialog ? 1 : 0),
+            ("$seventhDay", s.EnableSeventhDayOvertime ? 1 : 0),
             ("$backup", s.LastBackupPath));
     }
 

@@ -4,7 +4,7 @@ namespace PunchPoint.Core.Storage;
 
 public static class Schema
 {
-    public const int CurrentVersion = 2;
+    public const int CurrentVersion = 3;
 
     public static void Ensure(Database db)
     {
@@ -28,6 +28,20 @@ public static class Schema
                 // column already present
             }
             SetVersion(db, 2);
+        }
+
+        if (version < 3)
+        {
+            foreach (var sql in new[]
+                     {
+                         "ALTER TABLE settings ADD COLUMN totals_format INTEGER NOT NULL DEFAULT 1;",
+                         "ALTER TABLE settings ADD COLUMN show_punch_comment INTEGER NOT NULL DEFAULT 1;",
+                         "ALTER TABLE settings ADD COLUMN enable_7th_day_ot INTEGER NOT NULL DEFAULT 0;",
+                     })
+            {
+                try { db.Execute(sql); } catch { /* already present */ }
+            }
+            SetVersion(db, 3);
         }
     }
 
@@ -57,6 +71,9 @@ public static class Schema
                 company_message     TEXT NOT NULL DEFAULT '',
                 admin_pin           TEXT NOT NULL DEFAULT '',
                 admin_password      TEXT NOT NULL DEFAULT '',
+                totals_format       INTEGER NOT NULL DEFAULT 1,
+                show_punch_comment  INTEGER NOT NULL DEFAULT 1,
+                enable_7th_day_ot   INTEGER NOT NULL DEFAULT 0,
                 period_type         INTEGER NOT NULL DEFAULT 0,
                 period_anchor       TEXT NOT NULL,
                 semi_monthly_split  INTEGER NOT NULL DEFAULT 16,

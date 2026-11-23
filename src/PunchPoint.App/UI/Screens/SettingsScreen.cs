@@ -24,6 +24,9 @@ public sealed class SettingsScreen : ScreenBase
     private readonly NumericUpDown _dayChange = Number(0, 12, 0, 80);
     private readonly NumericUpDown _maxSpan = Number(4, 24, 0, 80);
 
+    private readonly ComboBox _totalsFormat = Theme.Dropdown(180);
+    private readonly CheckBox _seventhDay = Theme.Check("Enable 7th day overtime (all hours on a 7th consecutive day are overtime)");
+    private readonly CheckBox _punchComment = Theme.Check("Ask for a comment when a supervisor adds a punch");
     private readonly CheckBox _roundDayTotal = Theme.Check("Round the day total instead of each punch");
     private readonly CheckBox _requireApproval = Theme.Check("Warn before exporting a period that is not fully approved");
     private readonly CheckBox _startWithWindows = Theme.Check("Start the clock automatically when Windows starts");
@@ -122,7 +125,15 @@ public sealed class SettingsScreen : ScreenBase
         stack.Add(Row("Hours after midnight belong to previous day", _dayChange));
         stack.Add(Row("Warn about shifts longer than (hours)", _maxSpan));
 
+        var totalsRow = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false };
+        totalsRow.Controls.Add(new Label { Text = "Totals shown as", Width = 300, AutoSize = false, Margin = new Padding(0, 8, 8, 0), ForeColor = Theme.TextMuted });
+        _totalsFormat.Items.AddRange(new object[] { "Hundredths (8.50)", "Minutes (8:30)" });
+        totalsRow.Controls.Add(_totalsFormat);
+        stack.Add(totalsRow);
+
         var toggles = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Margin = new Padding(0, 6, 0, 0) };
+        toggles.Controls.Add(_seventhDay);
+        toggles.Controls.Add(_punchComment);
         toggles.Controls.Add(_roundDayTotal);
         toggles.Controls.Add(_requireApproval);
         toggles.Controls.Add(_startWithWindows);
@@ -293,6 +304,9 @@ public sealed class SettingsScreen : ScreenBase
         _weeklyOt2.Value = Math.Clamp(s.WeeklyOverTime2Minutes / 60m, 0, 168);
         _dayChange.Value = Math.Clamp(s.DayChangeOffsetMinutes / 60m, 0, 12);
         _maxSpan.Value = Math.Clamp(s.MaxPunchSpanMinutes / 60m, 4, 24);
+        _totalsFormat.SelectedIndex = s.TotalsFormat == TotalsFormat.Minutes ? 1 : 0;
+        _seventhDay.Checked = s.EnableSeventhDayOvertime;
+        _punchComment.Checked = s.ShowPunchCommentDialog;
         _roundDayTotal.Checked = s.RoundDailyTotalInsteadOfPunches;
         _requireApproval.Checked = s.RequireApprovalBeforeExport;
         _startWithWindows.Checked = IsAutoStartEnabled();
@@ -424,6 +438,9 @@ public sealed class SettingsScreen : ScreenBase
         s.DayChangeOffsetMinutes = (int)(_dayChange.Value * 60);
         s.MaxPunchSpanMinutes = (int)(_maxSpan.Value * 60);
         s.RoundDailyTotalInsteadOfPunches = _roundDayTotal.Checked;
+        s.TotalsFormat = _totalsFormat.SelectedIndex == 1 ? TotalsFormat.Minutes : TotalsFormat.Hundredths;
+        s.EnableSeventhDayOvertime = _seventhDay.Checked;
+        s.ShowPunchCommentDialog = _punchComment.Checked;
         s.RequireApprovalBeforeExport = _requireApproval.Checked;
 
         Services.Store.SaveSettings(s);

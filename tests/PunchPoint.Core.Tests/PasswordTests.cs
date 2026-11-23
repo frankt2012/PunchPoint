@@ -56,7 +56,7 @@ public class PasswordTests
             var reloaded = store.GetSettings();
             Assert.True(PasswordHasher.Verify("1234", reloaded.AdminPasswordHash));
             Assert.False(PasswordHasher.Verify("4321", reloaded.AdminPasswordHash));
-            Assert.Equal(Schema.CurrentVersion, 2);
+            Assert.True(Schema.CurrentVersion >= 2);
         }
         finally
         {

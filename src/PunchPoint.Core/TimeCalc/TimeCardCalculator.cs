@@ -61,6 +61,7 @@ public static class TimeCardCalculator
             byDay.TryAdd(holiday.Date.Date, new List<SegmentBuild>());
 
         var weeks = new Dictionary<int, WeekBucket>();
+        int consecutiveWorkedDays = 0;
 
         for (DateTime day = period.Start.Date; day <= period.End.Date; day = day.AddDays(1))
         {
@@ -94,7 +95,14 @@ public static class TimeCardCalculator
             if (!weeks.TryGetValue(weekIndex, out var bucket))
                 weeks[weekIndex] = bucket = new WeekBucket();
 
-            SplitOvertime(totals, built.PaidMinutes, built.MiscMinutes, settings, bucket);
+            if (built.PaidMinutes > 0)
+                consecutiveWorkedDays++;
+            else
+                consecutiveWorkedDays = 0;
+
+            bool seventhDay = settings.EnableSeventhDayOvertime && consecutiveWorkedDays >= 7 && built.PaidMinutes > 0;
+
+            SplitOvertime(totals, built.PaidMinutes, built.MiscMinutes, settings, bucket, seventhDay);
 
             result.Days.Add(totals);
 
@@ -390,11 +398,21 @@ public static class TimeCardCalculator
 
     private static void SplitOvertime(
         DayTotals day, int paidMinutes, int miscMinutes,
-        AppSettings settings, WeekBucket week)
+        AppSettings settings, WeekBucket week, bool seventhDay = false)
     {
         int remaining = paidMinutes;
         int ot1 = 0;
         int ot2 = 0;
+
+        if (seventhDay)
+        {
+            // Every hour on a 7th consecutive day is overtime; vacation/sick stay regular.
+            week.OverTime1 += remaining;
+            day.RegularMinutes = miscMinutes;
+            day.OverTime1Minutes = remaining;
+            day.OverTime2Minutes = 0;
+            return;
+        }
 
         // Daily level 2 first, then level 1.
         if (settings.DailyOverTime2Minutes > 0 && remaining > settings.DailyOverTime2Minutes)

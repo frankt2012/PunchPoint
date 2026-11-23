@@ -2,6 +2,12 @@ using PunchPoint.Core.Models;
 
 namespace PunchPoint.Core.Models;
 
+public enum TotalsFormat
+{
+    Minutes = 0,
+    Hundredths = 1,
+}
+
 public sealed class AppSettings
 {
     public string CompanyName { get; set; } = "My Company";
@@ -42,6 +48,15 @@ public sealed class AppSettings
 
     public bool RequireApprovalBeforeExport { get; set; }
     public bool RoundDailyTotalInsteadOfPunches { get; set; }
+
+    /// <summary>How totals are displayed: minutes (8:30) or hundredths (8.50).</summary>
+    public TotalsFormat TotalsFormat { get; set; } = TotalsFormat.Hundredths;
+
+    /// <summary>Ask for a comment when a punch is added manually (old timeQplus option).</summary>
+    public bool ShowPunchCommentDialog { get; set; } = true;
+
+    /// <summary>All hours on a 7th consecutive worked day become overtime.</summary>
+    public bool EnableSeventhDayOvertime { get; set; }
 
     public string TimeFormat { get; set; } = "h:mm tt";
     public string DateFormat { get; set; } = "M/d/yyyy";

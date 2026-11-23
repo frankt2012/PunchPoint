@@ -5,34 +5,45 @@ using PunchPoint.Core.TimeCalc;
 
 namespace PunchPoint.App.UI.Screens;
 
+/// <summary>
+/// Punch editing, modelled on the old timeQplus screen: pick an employee and a pay period,
+/// see every punch with day totals, insert/delete punches, adjust totals and approve.
+/// </summary>
 public sealed class TimeCardsScreen : ScreenBase
 {
-    private readonly ComboBox _periods = Theme.Dropdown(300);
-    private readonly DataGridView _employees = new();
-    private readonly DataGridView _days = new();
-    private readonly Label _detailTitle = new() { AutoSize = true, Font = Theme.H2, ForeColor = Theme.Text };
-    private readonly Label _detailSubtitle = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
-    private readonly Label _totalsLabel = new() { AutoSize = true, Font = Theme.Body, ForeColor = Theme.Text };
-    private readonly Label _summaryLabel = new() { AutoSize = true, Font = Theme.Body, ForeColor = Theme.TextMuted };
-    private readonly Button _approve = Theme.PrimaryButton("Approve time card", 170);
-    private readonly Button _adjust = Theme.SecondaryButton("Adjust hours", 130);
-    private readonly Button _addPunch = Theme.SecondaryButton("Add punch", 110);
+    private readonly ComboBox _employee = Theme.Dropdown(260);
+    private readonly ComboBox _period = Theme.Dropdown(240);
+    private readonly DataGridView _grid = new();
+    private readonly Label _totals = new() { AutoSize = true, Font = new Font(Theme.Family, 10.5f, FontStyle.Bold), ForeColor = Theme.Text };
+    private readonly Label _status = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
+    private readonly Button _approve = Theme.PrimaryButton("Approve", 120);
+    private readonly Button _delete = Theme.SecondaryButton("Delete", 90);
+    private readonly Button _edit = Theme.SecondaryButton("Edit", 90);
 
-    private List<PayPeriod> _loadedPeriods = new();
-    private Employee? _selectedEmployee;
+    private List<Employee> _employees = new();
+    private List<PayPeriod> _periods = new();
+    private bool _loading;
 
     public TimeCardsScreen(AppServices services)
-        : base(services, "Time Cards", "Review, correct and approve hours")
+        : base(services, "Punch Editing", "Review and correct punches, then approve the time card")
     {
-        _periods.Margin = new Padding(0, 8, 8, 0);
-        _periods.SelectedIndexChanged += (_, _) => LoadPeriod();
-        Actions.Controls.Add(_periods);
+        Actions.Controls.Add(new Label { Text = "Employee", AutoSize = true, Margin = new Padding(0, 14, 6, 0) });
+        _employee.Margin = new Padding(0, 8, 10, 0);
+        _employee.SelectedIndexChanged += (_, _) => LoadEmployee();
+        Actions.Controls.Add(_employee);
 
-        var export = Theme.SecondaryButton("Export CSV", 120);
-        export.Click += (_, _) => ExportCsv();
-        Actions.Controls.Add(export);
+        Actions.Controls.Add(new Label { Text = "Pay period", AutoSize = true, Margin = new Padding(0, 14, 6, 0) });
+        _period.Margin = new Padding(0, 8, 10, 0);
+        _period.SelectedIndexChanged += (_, _) => LoadEmployee();
+        Actions.Controls.Add(_period);
 
-        var print = Theme.SecondaryButton("Print", 90);
+        var add = Theme.PrimaryButton("Add punch", 110);
+        add.Margin = new Padding(0, 5, 6, 0);
+        add.Click += (_, _) => AddPunch();
+        Actions.Controls.Add(add);
+
+        var print = Theme.SecondaryButton("Print", 80);
+        print.Margin = new Padding(0, 5, 0, 0);
         print.Click += (_, _) => PrintTimeCard();
         Actions.Controls.Add(print);
 
@@ -40,286 +51,275 @@ public sealed class TimeCardsScreen : ScreenBase
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 2,
+            RowCount = 3,
             Margin = new Padding(0),
             Padding = new Padding(0),
         };
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 76));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
 
-        _summaryLabel.Margin = new Padding(0, 0, 0, 12);
-        _summaryLabel.Dock = DockStyle.Top;
-        layout.Controls.Add(_summaryLabel, 0, 0);
+        var gridCard = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Surface, Padding = new Padding(14) };
+        Theme.StyleGrid(_grid);
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Date", FillWeight = 120 });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Time", FillWeight = 90 });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Type", FillWeight = 90 });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Hours", FillWeight = 70 });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Day total", FillWeight = 80 });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Comment", FillWeight = 300 });
+        gridCard.Controls.Add(_grid);
+        layout.Controls.Add(gridCard, 0, 0);
 
-        var split = new TableLayoutPanel
+        var totalsCard = new Panel
         {
             Dock = DockStyle.Fill,
-            ColumnCount = 2,
-            RowCount = 1,
+            BackColor = Theme.SurfaceAlt,
+            Padding = new Padding(16, 10, 16, 8),
+            Margin = new Padding(0, 10, 0, 0),
+        };
+        _totals.Location = new Point(14, 10);
+        _status.Location = new Point(14, 38);
+        totalsCard.Controls.Add(_totals);
+        totalsCard.Controls.Add(_status);
+
+        var adjust = Theme.SecondaryButton("Edit totals", 110);
+        adjust.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        adjust.Location = new Point(totalsCard.Width - 130, 16);
+        adjust.Click += (_, _) => AdjustTotals();
+        totalsCard.Controls.Add(adjust);
+        totalsCard.Resize += (_, _) => adjust.Left = totalsCard.Width - 130;
+
+        _delete.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        _delete.Location = new Point(totalsCard.Width - 240, 16);
+        _delete.Click += (_, _) => DeleteSelected();
+        totalsCard.Controls.Add(_delete);
+
+        _edit.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+        _edit.Location = new Point(totalsCard.Width - 336, 16);
+        _edit.Click += (_, _) => EditSelected();
+        totalsCard.Controls.Add(_edit);
+
+        layout.Controls.Add(totalsCard, 0, 1);
+
+        var approveRow = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            FlowDirection = FlowDirection.RightToLeft,
+            Padding = new Padding(0, 8, 0, 0),
             Margin = new Padding(0),
         };
-        split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 44));
-        split.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 56));
-        layout.Controls.Add(split, 0, 1);
+        _approve.Click += (_, _) => ToggleApproval();
+        approveRow.Controls.Add(_approve);
+        layout.Controls.Add(approveRow, 0, 2);
+
         Body.Controls.Add(layout);
 
-        // -------- left: employees --------
-        var leftCard = Theme.Card(0);
-        leftCard.Dock = DockStyle.Fill;
-        leftCard.Margin = new Padding(0, 0, 12, 0);
-        leftCard.AutoSize = false;
-
-        Theme.StyleGrid(_employees);
-        _employees.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Employee", FillWeight = 190 });
-        _employees.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Reg", FillWeight = 70 });
-        _employees.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "OT1", FillWeight = 65 });
-        _employees.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "OT2", FillWeight = 65 });
-        _employees.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Hol", FillWeight = 60 });
-        _employees.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Total", FillWeight = 75 });
-        _employees.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "✓", FillWeight = 40 });
-        _employees.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "!", FillWeight = 35 });
-
-        var leftHost = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12) };
-        leftHost.Controls.Add(_employees);
-        leftCard.Controls.Add(leftHost);
-        _employees.SelectionChanged += (_, _) => ShowSelectedEmployee();
-
-        split.Controls.Add(leftCard, 0, 0);
-
-        // -------- right: detail --------
-        var rightCard = Theme.Card(0);
-        rightCard.Dock = DockStyle.Fill;
-        rightCard.AutoSize = false;
-
-        var detailHeader = new Panel { Dock = DockStyle.Top, Height = 78, Padding = new Padding(18, 14, 18, 0) };
-        _detailTitle.Location = new Point(16, 12);
-        _detailSubtitle.Location = new Point(18, 44);
-        detailHeader.Controls.Add(_detailTitle);
-        detailHeader.Controls.Add(_detailSubtitle);
-
-        var detailFooter = new Panel { Dock = DockStyle.Bottom, Height = 96, Padding = new Padding(18, 8, 18, 14) };
-        _totalsLabel.Location = new Point(18, 8);
-        detailFooter.Controls.Add(_totalsLabel);
-
-        var footerButtons = new FlowLayoutPanel
+        _grid.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) EditSelected(); };
+        _grid.KeyDown += (_, e) =>
         {
-            Dock = DockStyle.Bottom,
-            FlowDirection = FlowDirection.LeftToRight,
-            Height = 46,
-            WrapContents = false,
+            if (e.KeyCode == Keys.Delete) DeleteSelected();
+            if (e.KeyCode == Keys.Insert) AddPunch();
         };
-        footerButtons.Controls.Add(_addPunch);
-        footerButtons.Controls.Add(_adjust);
-        footerButtons.Controls.Add(_approve);
-        detailFooter.Controls.Add(footerButtons);
-        footerButtons.BringToFront();
-
-        Theme.StyleGrid(_days);
-        _days.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Day", FillWeight = 110 });
-        _days.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "In", FillWeight = 80 });
-        _days.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Out", FillWeight = 80 });
-        _days.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Break", FillWeight = 65 });
-        _days.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Reg", FillWeight = 65 });
-        _days.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "OT", FillWeight = 60 });
-        _days.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Hol", FillWeight = 55 });
-        _days.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Total", FillWeight = 70 });
-        _days.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Notes", FillWeight = 240 });
-
-        var detailHost = new Panel { Dock = DockStyle.Fill, Padding = new Padding(18, 0, 18, 8) };
-        detailHost.Controls.Add(_days);
-
-        rightCard.Controls.Add(detailHost);
-        rightCard.Controls.Add(detailFooter);
-        rightCard.Controls.Add(detailHeader);
-        split.Controls.Add(rightCard, 1, 0);
-
-        _approve.Click += (_, _) => ToggleApproval();
-        _adjust.Click += (_, _) => AdjustHours();
-        _addPunch.Click += (_, _) => AddPunch();
-        _days.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) ShowDayDetails(); };
-        _employees.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) ShowDayDetails(); };
     }
 
     public override void RefreshData()
     {
-        _loadedPeriods = Services.Store.ListPayPeriods().OrderByDescending(p => p.Start).ToList();
-        var current = Services.Store.GetCurrentPayPeriod();
+        bool first = _employees.Count == 0;
+        _employees = Services.Store.ListEmployees(includeInactive: true);
+        _periods = Services.Store.ListPayPeriods().OrderByDescending(p => p.Start).ToList();
 
-        int select = current is null ? 0 : Math.Max(0, _loadedPeriods.FindIndex(p => p.Id == current.Id));
-
-        _periods.Items.Clear();
-        foreach (var period in _loadedPeriods)
-            _periods.Items.Add($"{period.Start:MMM d} – {period.End:MMM d, yyyy}   ({period.Type})");
-
-        if (_loadedPeriods.Count > 0)
+        _loading = true;
+        try
         {
-            _periods.SelectedIndex = select;
+            _employee.Items.Clear();
+            foreach (var employee in _employees.OrderBy(e => e.SortName))
+                _employee.Items.Add($"{employee.SortName}   ({employee.Pin})");
+
+            _period.Items.Clear();
+            foreach (var period in _periods)
+                _period.Items.Add($"{period.Start:MMM d} – {period.End:MMM d, yyyy}");
+
+            var current = Services.Store.GetCurrentPayPeriod();
+            int periodIndex = current is null ? 0 : Math.Max(0, _periods.FindIndex(p => p.Id == current.Id));
+            if (_periods.Count > 0) _period.SelectedIndex = periodIndex;
+
+            if (_employee.Items.Count > 0 && (first || _employee.SelectedIndex < 0))
+                _employee.SelectedIndex = 0;
+        }
+        finally
+        {
+            _loading = false;
         }
 
-        LoadPeriod();
+        LoadEmployee();
     }
 
-    private PayPeriod? CurrentPeriod =>
-        _periods.SelectedIndex >= 0 && _periods.SelectedIndex < _loadedPeriods.Count
-            ? _loadedPeriods[_periods.SelectedIndex]
+    private Employee? SelectedEmployee =>
+        _employee.SelectedIndex >= 0 && _employee.SelectedIndex < _employees.OrderBy(e => e.SortName).Count()
+            ? _employees.OrderBy(e => e.SortName).ElementAt(_employee.SelectedIndex)
             : null;
 
-    private void LoadPeriod()
+    private PayPeriod? SelectedPeriod =>
+        _period.SelectedIndex >= 0 && _period.SelectedIndex < _periods.Count ? _periods[_period.SelectedIndex] : null;
+
+    private void LoadEmployee()
     {
-        var period = CurrentPeriod;
-        _employees.Rows.Clear();
-        _days.Rows.Clear();
-        _selectedEmployee = null;
+        if (_loading) return;
 
-        if (period is null)
-        {
-            _summaryLabel.Text = "No pay periods yet. Add them in Settings.";
-            return;
-        }
-
-        var employees = Services.Store.ListEmployees(includeInactive: true);
-        int regTotal = 0, otTotal = 0, holTotal = 0, issueTotal = 0, approvedCount = 0, withTime = 0;
-
-        foreach (var employee in employees)
-        {
-            var summary = Services.SummaryFor(employee, period);
-            if (summary.TotalMinutes == 0 && summary.IssueCount == 0) continue;
-
-            withTime++;
-            regTotal += summary.RegularMinutes;
-            otTotal += summary.OverTime1Minutes + summary.OverTime2Minutes;
-            holTotal += summary.HolidayMinutes;
-            issueTotal += summary.IssueCount;
-
-            var card = Services.Store.GetTimeCard(employee.Id, period.Id);
-            if (card?.Approved == true) approvedCount++;
-
-            int rowIndex = _employees.Rows.Add(
-                employee.SortName,
-                Fmt.Hours(summary.RegularMinutes),
-                Fmt.HoursOrDash(summary.OverTime1Minutes),
-                Fmt.HoursOrDash(summary.OverTime2Minutes),
-                Fmt.HoursOrDash(summary.HolidayMinutes),
-                Fmt.Hours(summary.TotalMinutes),
-                card?.Approved == true ? "✓" : "",
-                summary.IssueCount > 0 ? summary.IssueCount.ToString() : "");
-
-            _employees.Rows[rowIndex].Tag = employee;
-            if (summary.IssueCount > 0)
-                _employees.Rows[rowIndex].Cells[7].Style.ForeColor = Theme.Warning;
-            if (card?.Approved == true)
-                _employees.Rows[rowIndex].Cells[6].Style.ForeColor = Theme.Success;
-        }
-
-        string periodLabel = $"{period.Start:MMM d} – {period.End:MMM d}";
-        _summaryLabel.Text =
-            $"{periodLabel}:   Regular {Fmt.Hours(regTotal)} h   ·   Overtime {Fmt.Hours(otTotal)} h   ·   " +
-            $"Holiday {Fmt.Hours(holTotal)} h   ·   Total {Fmt.Hours(regTotal + otTotal + holTotal)} h   ·   " +
-            $"{approvedCount}/{withTime} approved" +
-            (issueTotal > 0 ? $"   ·   {issueTotal} punch issue(s)" : "");
-
-        if (_employees.Rows.Count > 0)
-        {
-            _employees.Rows[0].Selected = true;
-            _employees.CurrentCell = _employees.Rows[0].Cells[0];
-        }
-
-        ShowSelectedEmployee();
-    }
-
-    private void ShowSelectedEmployee()
-    {
-        var employee = _employees.SelectedRows.Count > 0 ? _employees.SelectedRows[0].Tag as Employee : null;
-        var period = CurrentPeriod;
-        _days.Rows.Clear();
+        var employee = SelectedEmployee;
+        var period = SelectedPeriod;
+        _grid.Rows.Clear();
 
         if (employee is null || period is null)
         {
-            _selectedEmployee = null;
-            _detailTitle.Text = "";
-            _detailSubtitle.Text = "Select an employee to see their days.";
-            _totalsLabel.Text = "";
+            _totals.Text = "Select an employee and a pay period.";
+            _status.Text = "";
             return;
         }
 
-        _selectedEmployee = employee;
         var punches = Services.Store.ListPunches(employee.Id, period.Start, period.End.AddDays(1));
         var shift = employee.ShiftId is int id ? Services.Store.GetShift(id) : null;
         var card = Services.Store.GetTimeCard(employee.Id, period.Id);
-
         var result = TimeCardCalculator.Calculate(employee, shift, period, punches, Services.Settings,
             Services.Store.ListHolidays(), card);
 
-        _detailTitle.Text = employee.SortName;
-        _detailSubtitle.Text = shift is null
-            ? $"{employee.PayType} · no shift assigned"
-            : $"{shift.Name} · {shift.TimeRangeLabel}" +
-              (shift.LunchEnabled && shift.LunchAutoAfterMinutes > 0 ? $" · auto lunch {shift.LunchDurationMinutes} min" : "");
+        var dayTotals = result.Days.ToDictionary(d => d.WorkDate.Date, d => d);
+
+        // One row per punch, plus rows for days that only have paid holiday/misc hours.
+        var byDay = punches.GroupBy(p => TimeCardCalculator.WorkDate(p.Timestamp, Services.Settings.DayChangeOffsetMinutes))
+            .ToDictionary(g => g.Key, g => g.OrderBy(p => p.Timestamp).ToList());
 
         foreach (var day in result.Days)
         {
-            int index = _days.Rows.Add(
-                day.WorkDate.ToString("ddd M/d"),
-                day.FirstInLabel,
-                day.LastOutLabel,
-                day.BreakMinutes > 0 ? day.BreakMinutes.ToString() : "",
-                Fmt.HoursOrDash(day.RegularMinutes),
-                Fmt.HoursOrDash(day.OverTime1Minutes + day.OverTime2Minutes),
-                Fmt.HoursOrDash(day.HolidayMinutes),
-                Fmt.HoursOrDash(day.TotalMinutes),
-                day.Issues.Count > 0
-                    ? day.Issues[0]
-                    : day.IsHoliday ? $"{day.HolidayName} (paid holiday)" : "");
+            if (byDay.TryGetValue(day.WorkDate.Date, out var dayPunches) && dayPunches.Count > 0)
+            {
+                for (int i = 0; i < dayPunches.Count; i++)
+                {
+                    var punch = dayPunches[i];
+                    int index = _grid.Rows.Add(
+                        i == 0 ? day.WorkDate.ToString("ddd M/d/yyyy") : "",
+                        punch.Timestamp.ToString("h:mm tt"),
+                        KindLabel(punch.Kind),
+                        punch.Kind == PunchKind.Hours ? (punch.Hours.TotalMinutes / 60.0).ToString("0.00") : "",
+                        i == 0 ? HoursText(day.TotalMinutes) : "",
+                        punch.Comment);
 
-            _days.Rows[index].Tag = day;
-            if (day.Issues.Count > 0)
-            {
-                _days.Rows[index].Cells[8].Style.ForeColor = Theme.Warning;
-                _days.Rows[index].DefaultCellStyle.BackColor = Color.FromArgb(0xFF, 0xFB, 0xEB);
+                    _grid.Rows[index].Tag = punch;
+                    if (punch.Kind is PunchKind.BreakOut or PunchKind.BreakIn)
+                        _grid.Rows[index].Cells[2].Style.ForeColor = Theme.TextMuted;
+                    if (punch.Kind == PunchKind.Hours)
+                        _grid.Rows[index].Cells[2].Style.ForeColor = Theme.Primary;
+                    if (day.Issues.Count > 0 && i == 0)
+                        _grid.Rows[index].Cells[0].Style.ForeColor = Theme.Warning;
+                }
             }
-            else if (day.IsHoliday)
+            else if (day.TotalMinutes > 0)
             {
-                _days.Rows[index].DefaultCellStyle.BackColor = Theme.SuccessSoft;
+                int index = _grid.Rows.Add(day.WorkDate.ToString("ddd M/d/yyyy"), "",
+                    day.IsHoliday ? "Holiday" : "Hours", "", HoursText(day.TotalMinutes),
+                    day.IsHoliday ? day.HolidayName ?? "" : "");
+                _grid.Rows[index].Tag = null;
             }
         }
 
-        _totalsLabel.Text =
-            $"Regular {Fmt.Hours(result.RegularMinutes)} h    Overtime {Fmt.Hours(result.OverTime1Minutes + result.OverTime2Minutes)} h    " +
-            $"Holiday {Fmt.Hours(result.HolidayMinutes)} h    Adjustment {Fmt.Hours(result.AdjustmentMinutes)} h    " +
-            $"Total {Fmt.Hours(result.TotalMinutes)} h";
+        int vacation = punches.Where(p => p.Kind == PunchKind.Hours && p.HoursCategory == "Vacation").Sum(p => (int)p.Hours.TotalMinutes);
+        int sick = punches.Where(p => p.Kind == PunchKind.Hours && p.HoursCategory == "Sick").Sum(p => (int)p.Hours.TotalMinutes);
+        int other = punches.Where(p => p.Kind == PunchKind.Hours && p.HoursCategory == "Other").Sum(p => (int)p.Hours.TotalMinutes);
 
-        _approve.Text = card?.Approved == true ? "Approved — undo" : "Approve time card";
-        _approve.BackColor = card?.Approved == true ? Theme.SurfaceAlt : Theme.Primary;
-        _approve.ForeColor = card?.Approved == true ? Theme.Text : Color.White;
+        var settings = Services.Settings;
+        _totals.Text =
+            $"Regular {HoursText(result.RegularMinutes)}     " +
+            $"Overtime 1 {HoursText(result.OverTime1Minutes)}     " +
+            $"Overtime 2 {HoursText(result.OverTime2Minutes)}     " +
+            $"Vacation {HoursText(vacation)}     " +
+            $"Sick {HoursText(sick)}     " +
+            $"Other {HoursText(other)}     " +
+            $"Holiday {HoursText(result.HolidayMinutes)}     " +
+            $"TOTAL {HoursText(result.TotalMinutes)}";
+
+        var issues = result.Issues.Count;
+        _status.Text = issues == 0
+            ? $"{punches.Count} punches · no problems detected"
+            : $"{punches.Count} punches · {issues} issue(s) need attention (orange dates)";
+        _status.ForeColor = issues == 0 ? Theme.TextMuted : Theme.Warning;
+
+        _approve.Text = card?.Approved == true ? "Approved ✓" : "Approve";
+        _approve.BackColor = card?.Approved == true ? Theme.Success : Theme.Primary;
+        _approve.ForeColor = Color.White;
+
+        if (_grid.Rows.Count == 0)
+            _grid.Rows.Add("", "", "No punches in this period", "", "", "");
     }
 
-    private void ToggleApproval()
+    private string HoursText(int minutes) =>
+        Services.Settings.TotalsFormat == TotalsFormat.Minutes
+            ? $"{(minutes / 60)}:{(minutes % 60):00}"
+            : (minutes / 60.0).ToString("0.00");
+
+    private static string KindLabel(PunchKind kind) => kind switch
     {
-        var employee = _selectedEmployee;
-        var period = CurrentPeriod;
-        if (employee is null || period is null) return;
+        PunchKind.In => "IN",
+        PunchKind.Out => "OUT",
+        PunchKind.BreakOut => "Break out",
+        PunchKind.BreakIn => "Break in",
+        PunchKind.Hours => "Paid hours",
+        _ => kind.ToString(),
+    };
 
-        var card = Services.Store.GetOrCreateTimeCard(employee.Id, period.Id);
-        card.Approved = !card.Approved;
-        card.ApprovedAt = card.Approved ? DateTime.Now : null;
-        card.ApprovedBy = Environment.UserName;
-        Services.Store.SaveTimeCard(card);
-        Services.Store.Audit(card.Approved ? "Time card approved" : "Time card approval removed",
-            $"{employee.DisplayName} {period.Label}");
+    private Punch? SelectedPunch =>
+        _grid.SelectedRows.Count > 0 ? _grid.SelectedRows[0].Tag as Punch : null;
 
+    private void AddPunch()
+    {
+        var employee = SelectedEmployee;
+        if (employee is null) return;
+
+        using var dialog = new PunchEditDialog(Services, employee, null);
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            Services.NotifyDataChanged();
+            RefreshData();
+        }
+    }
+
+    private void EditSelected()
+    {
+        var employee = SelectedEmployee;
+        var punch = SelectedPunch;
+        if (employee is null || punch is null) return;
+
+        using var dialog = new PunchEditDialog(Services, employee, punch);
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+        {
+            Services.NotifyDataChanged();
+            RefreshData();
+        }
+    }
+
+    private void DeleteSelected()
+    {
+        var employee = SelectedEmployee;
+        var punch = SelectedPunch;
+        if (employee is null || punch is null) return;
+
+        if (!PromptDialog.Confirm(this,
+                $"Delete the {KindLabel(punch.Kind).ToLowerInvariant()} punch at {punch.Timestamp:g}?"))
+            return;
+
+        Services.Store.DeletePunch(punch.Id);
+        Services.Store.Audit("Punch deleted", $"{employee.DisplayName} {punch.Timestamp:g}");
         Services.NotifyDataChanged();
-        LoadPeriod();
+        RefreshData();
     }
 
-    private void AdjustHours()
+    private void AdjustTotals()
     {
-        var employee = _selectedEmployee;
-        var period = CurrentPeriod;
+        var employee = SelectedEmployee;
+        var period = SelectedPeriod;
         if (employee is null || period is null) return;
 
-        string? input = PromptDialog.AskText(this, "Adjust hours",
-            "Minutes to add to regular hours (use a negative number to subtract).", "0");
-
+        string? input = PromptDialog.AskText(this, "Edit totals",
+            "Minutes to add to regular hours (negative to subtract).", "0");
         if (input is null || !int.TryParse(input, out int minutes)) return;
 
         var card = Services.Store.GetOrCreateTimeCard(employee.Id, period.Id);
@@ -327,58 +327,30 @@ public sealed class TimeCardsScreen : ScreenBase
         Services.Store.SaveTimeCard(card);
         Services.Store.Audit("Hours adjusted", $"{employee.DisplayName} {minutes} min");
         Services.NotifyDataChanged();
-        LoadPeriod();
+        LoadEmployee();
     }
 
-    private void AddPunch()
+    private void ToggleApproval()
     {
-        var employee = _selectedEmployee;
-        if (employee is null) return;
+        var employee = SelectedEmployee;
+        var period = SelectedPeriod;
+        if (employee is null || period is null) return;
 
-        using var dialog = new PunchEditDialog(Services, employee, null);
-        if (dialog.ShowDialog(this) == DialogResult.OK)
-        {
-            Services.NotifyDataChanged();
-            LoadPeriod();
-        }
-    }
-
-    private void ShowDayDetails()
-    {
-        var employee = _selectedEmployee;
-        var period = CurrentPeriod;
-        var day = _days.SelectedRows.Count > 0 ? _days.SelectedRows[0].Tag as DayTotals : null;
-        if (employee is null || period is null || day is null) return;
-
-        using var dialog = new DayDetailDialog(Services, employee, period, day);
-        dialog.ShowDialog(this);
+        var card = Services.Store.GetOrCreateTimeCard(employee.Id, period.Id);
+        card.Approved = !card.Approved;
+        card.ApprovedAt = card.Approved ? DateTime.Now : null;
+        card.ApprovedBy = Environment.UserName;
+        Services.Store.SaveTimeCard(card);
+        Services.Store.Audit(card.Approved ? "Time card approved" : "Approval removed",
+            $"{employee.DisplayName} {period.Label}");
         Services.NotifyDataChanged();
-        LoadPeriod();
-    }
-
-    private void ExportCsv()
-    {
-        var period = CurrentPeriod;
-        if (period is null) return;
-
-        using var dialog = new SaveFileDialog
-        {
-            Title = "Export payroll summary",
-            Filter = "CSV file (*.csv)|*.csv",
-            FileName = $"payroll-{period.Start:yyyy-MM-dd}.csv",
-        };
-
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
-
-        var rows = CsvExporter.BuildRows(Services.Store, period, Services.Settings);
-        CsvExporter.WritePayrollSummary(rows, dialog.FileName);
-        PromptDialog.Info(this, $"Exported {rows.Count} employees to\n{dialog.FileName}");
+        LoadEmployee();
     }
 
     private void PrintTimeCard()
     {
-        var employee = _selectedEmployee;
-        var period = CurrentPeriod;
+        var employee = SelectedEmployee;
+        var period = SelectedPeriod;
         if (employee is null || period is null) return;
 
         var punches = Services.Store.ListPunches(employee.Id, period.Start, period.End.AddDays(1));
@@ -386,10 +358,9 @@ public sealed class TimeCardsScreen : ScreenBase
         var result = TimeCardCalculator.Calculate(employee, shift, period, punches, Services.Settings,
             Services.Store.ListHolidays(), Services.Store.GetTimeCard(employee.Id, period.Id));
 
-        var document = new TimeCardPrintDocument(Services.Settings, result);
         using var preview = new PrintPreviewDialog
         {
-            Document = document,
+            Document = new TimeCardPrintDocument(Services.Settings, result),
             Width = 1000,
             Height = 760,
             Text = $"Time card — {employee.SortName}",

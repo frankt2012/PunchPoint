@@ -15,11 +15,13 @@ internal sealed class ScreenTour
         ("clock", "1-clock"),
         ("dashboard", "2-dashboard"),
         ("employees", "3-employees"),
-        ("timecards", "4-timecards"),
-        ("punches", "5-punches"),
-        ("import", "6-import"),
-        ("reports", "7-reports"),
-        ("settings", "8-settings"),
+        ("messages", "4-messages"),
+        ("timecards", "5-punchediting"),
+        ("punches", "6-punches"),
+        ("import", "7-import"),
+        ("reports", "8-reports"),
+        ("export", "9-export"),
+        ("settings", "10-settings"),
     };
 
     private readonly MainForm _form;
