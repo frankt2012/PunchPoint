@@ -52,7 +52,7 @@ public static class PayPeriodGenerator
                     ? new DateTime(anchor.Year, anchor.Month, splitDay)
                     : new DateTime(anchor.Year, anchor.Month, 1);
             case PayPeriodType.Monthly:
-                return new DateTime(anchor.Year, anchor.Month, Math.Min(monthlyStartDay, DateTime.DaysInMonth(anchor.Year, anchor.Month)));
+                return new DateTime(anchor.Year, anchor.Month, 1);
             default:
                 return anchor;
         }

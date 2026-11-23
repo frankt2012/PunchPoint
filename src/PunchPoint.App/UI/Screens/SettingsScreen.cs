@@ -13,7 +13,6 @@ public sealed class SettingsScreen : ScreenBase
     private readonly ComboBox _periodType = Theme.Dropdown(200);
     private readonly DateTimePicker _anchor = new() { Format = DateTimePickerFormat.Short, Width = 140, Font = Theme.Body };
     private readonly NumericUpDown _splitDay = Number(1, 28, 0, 80);
-    private readonly NumericUpDown _monthlyDay = Number(1, 28, 0, 80);
 
     private readonly NumericUpDown _rounding = Number(0, 60, 0, 80);
     private readonly ComboBox _roundIn = Theme.Dropdown(170);
@@ -25,6 +24,9 @@ public sealed class SettingsScreen : ScreenBase
     private readonly NumericUpDown _dayChange = Number(0, 12, 0, 80);
     private readonly NumericUpDown _maxSpan = Number(4, 24, 0, 80);
 
+    private readonly CheckBox _roundDayTotal = Theme.Check("Round the day total instead of each punch");
+    private readonly CheckBox _requireApproval = Theme.Check("Warn before exporting a period that is not fully approved");
+    private readonly CheckBox _startWithWindows = Theme.Check("Start PunchPoint automatically when Windows starts");
     private readonly DataGridView _shifts = new();
     private readonly DataGridView _holidays = new();
     private readonly Label _dataLabel = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
@@ -83,7 +85,6 @@ public sealed class SettingsScreen : ScreenBase
         stack.Add(Row("Period length", _periodType));
         stack.Add(Row("A period starts on", _anchor));
         stack.Add(Row("Semi-monthly split day", _splitDay));
-        stack.Add(Row("Monthly start day", _monthlyDay));
 
         var generate = Theme.SecondaryButton("Create periods for 1 year back and forward", 330);
         generate.Click += (_, _) => GeneratePeriods();
@@ -115,6 +116,12 @@ public sealed class SettingsScreen : ScreenBase
         stack.Add(Row("Weekly double-time after (hours)", _weeklyOt2));
         stack.Add(Row("Hours after midnight belong to previous day", _dayChange));
         stack.Add(Row("Warn about shifts longer than (hours)", _maxSpan));
+
+        var toggles = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Margin = new Padding(0, 6, 0, 0) };
+        toggles.Controls.Add(_roundDayTotal);
+        toggles.Controls.Add(_requireApproval);
+        toggles.Controls.Add(_startWithWindows);
+        stack.Add(toggles);
 
         card.Controls.Add(stack);
         return card;
@@ -191,7 +198,25 @@ public sealed class SettingsScreen : ScreenBase
         _dataLabel.Text = $"{folder}\nDatabase: punchpoint.db · backups in the Backups folder";
         stack.Add(_dataLabel);
 
+        var counts = new Label { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
+        try
+        {
+            long size = new FileInfo(Services.Store.Db.Path).Length;
+            counts.Text =
+                $"{Services.Store.ListEmployees(includeInactive: true).Count} employees · " +
+                $"{Services.Store.CountPunches()} punches · " +
+                $"{Services.Store.ListPayPeriods().Count} pay periods · database {size / 1024.0 / 1024.0:F1} MB";
+        }
+        catch
+        {
+            counts.Text = "";
+        }
+        stack.Add(counts);
+
         var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false };
+        var check = Theme.SecondaryButton("Check database", 140);
+        check.Click += (_, _) => RunIntegrityCheck();
+        buttons.Controls.Add(check);
         var backup = Theme.SecondaryButton("Back up now", 120);
         backup.Click += (_, _) => BackupNow();
         var open = Theme.SecondaryButton("Open data folder", 150);
@@ -250,7 +275,6 @@ public sealed class SettingsScreen : ScreenBase
         _periodType.SelectedIndex = (int)s.PeriodType;
         _anchor.Value = s.PeriodAnchor;
         _splitDay.Value = s.SemiMonthlySplitDay;
-        _monthlyDay.Value = s.MonthlyStartDay;
 
         _rounding.Value = s.RoundingMinutes;
         _roundIn.SelectedIndex = s.RoundingMinutes == 0 ? 0 : (int)s.RoundInMode;
@@ -261,6 +285,9 @@ public sealed class SettingsScreen : ScreenBase
         _weeklyOt2.Value = Math.Clamp(s.WeeklyOverTime2Minutes / 60m, 0, 168);
         _dayChange.Value = Math.Clamp(s.DayChangeOffsetMinutes / 60m, 0, 12);
         _maxSpan.Value = Math.Clamp(s.MaxPunchSpanMinutes / 60m, 4, 24);
+        _roundDayTotal.Checked = s.RoundDailyTotalInsteadOfPunches;
+        _requireApproval.Checked = s.RequireApprovalBeforeExport;
+        _startWithWindows.Checked = IsAutoStartEnabled();
 
         LoadShifts();
         LoadHolidays();
@@ -364,7 +391,6 @@ public sealed class SettingsScreen : ScreenBase
         s.PeriodType = (PayPeriodType)Math.Max(0, _periodType.SelectedIndex);
         s.PeriodAnchor = _anchor.Value.Date;
         s.SemiMonthlySplitDay = (int)_splitDay.Value;
-        s.MonthlyStartDay = (int)_monthlyDay.Value;
 
         s.RoundingMinutes = (int)_rounding.Value;
         s.RoundInMode = (RoundingMode)Math.Max(1, _roundIn.SelectedIndex);
@@ -375,8 +401,11 @@ public sealed class SettingsScreen : ScreenBase
         s.WeeklyOverTime2Minutes = (int)(_weeklyOt2.Value * 60);
         s.DayChangeOffsetMinutes = (int)(_dayChange.Value * 60);
         s.MaxPunchSpanMinutes = (int)(_maxSpan.Value * 60);
+        s.RoundDailyTotalInsteadOfPunches = _roundDayTotal.Checked;
+        s.RequireApprovalBeforeExport = _requireApproval.Checked;
 
         Services.Store.SaveSettings(s);
+        TrySetAutoStart(_startWithWindows.Checked);
         Services.Store.Audit("Settings saved", s.CompanyName);
         Services.NotifyDataChanged();
 
@@ -399,6 +428,59 @@ public sealed class SettingsScreen : ScreenBase
 
         Services.NotifyDataChanged();
         PromptDialog.Info(this, $"Created or updated {periods.Count} pay periods.");
+    }
+
+    private void RunIntegrityCheck()
+    {
+        try
+        {
+            string result = Services.Store.Db.Scalar("PRAGMA integrity_check;")?.ToString() ?? "no result";
+            string message = result.Equals("ok", StringComparison.OrdinalIgnoreCase)
+                ? "The database is healthy."
+                : "The database reported a problem:\n\n" + result +
+                  "\n\nRestore the most recent backup from " + PunchPoint.Core.Storage.AppPaths.BackupsDirectory;
+            PromptDialog.Info(this, message);
+        }
+        catch (Exception ex)
+        {
+            PromptDialog.Warn(this, "The check could not run: " + ex.Message);
+        }
+    }
+
+    private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    private const string RunValueName = "PunchPoint";
+
+    private static bool IsAutoStartEnabled()
+    {
+        if (!OperatingSystem.IsWindows()) return false;
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKeyPath);
+            return key?.GetValue(RunValueName) is string;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void TrySetAutoStart(bool enabled)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKeyPath, writable: true);
+            if (key is null) return;
+
+            if (enabled)
+                key.SetValue(RunValueName, "\"" + Application.ExecutablePath + "\"");
+            else
+                key.DeleteValue(RunValueName, throwOnMissingValue: false);
+        }
+        catch
+        {
+            // registry access can be blocked by policy; the setting simply has no effect
+        }
     }
 
     private void BackupNow()

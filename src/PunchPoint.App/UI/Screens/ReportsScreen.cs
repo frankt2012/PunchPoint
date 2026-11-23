@@ -156,8 +156,20 @@ public sealed class ReportsScreen : ScreenBase
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
 
         var rows = CsvExporter.BuildRows(Services.Store, period, Services.Settings);
+        if (!ConfirmUnapproved(rows)) return;
         CsvExporter.WritePayrollSummary(rows, dialog.FileName);
         OfferOpen(dialog.FileName);
+    }
+
+    private bool ConfirmUnapproved(List<TimeCardExportRow> rows)
+    {
+        if (!Services.Settings.RequireApprovalBeforeExport) return true;
+
+        int unapproved = rows.Count(r => !r.Approved);
+        if (unapproved == 0) return true;
+
+        return PromptDialog.Confirm(this,
+            $"{unapproved} of {rows.Count} time cards in this period are not approved. Export anyway?");
     }
 
     private void ExportDaily()

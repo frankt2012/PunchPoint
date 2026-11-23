@@ -26,6 +26,7 @@ public sealed class ClockScreen : ScreenBase
 
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 1000 };
     private Employee? _selected;
+    private bool _hasEmployees;
     private DateTime _resetAt;
     private bool _showingResult;
 
@@ -357,7 +358,9 @@ public sealed class ClockScreen : ScreenBase
         var now = DateTime.Now;
         _time.Text = now.ToString("h:mm:ss tt");
         _date.Text = now.ToString("dddd, MMMM d, yyyy");
-        _message.Text = Services.Settings.CompanyMessage;
+        _message.Text = !_hasEmployees
+            ? "No employees yet — open Import to bring your timeQplus data across, or add people in Employees."
+            : Services.Settings.CompanyMessage;
 
         if (_selected is not null && !_showingResult)
         {
@@ -379,7 +382,10 @@ public sealed class ClockScreen : ScreenBase
 
     public override void RefreshData()
     {
-        _message.Text = Services.Settings.CompanyMessage;
+        _hasEmployees = Services.Store.ListEmployees(includeInactive: true).Count > 0;
+        _message.Text = _hasEmployees
+            ? Services.Settings.CompanyMessage
+            : "No employees yet — open Import to bring your timeQplus data across, or add people in Employees.";
         RefreshRecent();
 
         // While a confirmation is on screen, leave it alone; the person card is

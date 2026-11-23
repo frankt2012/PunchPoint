@@ -17,7 +17,7 @@ internal static class Program
     static void Main()
     {
         // Only one copy may run against the database at a time.
-        _singleInstance = new Mutex(true, @"Global\PunchPointTimeClock", out bool isFirst);
+        _singleInstance = new Mutex(true, @"Local\PunchPointTimeClock", out bool isFirst);
         if (!isFirst)
         {
             MessageBox.Show("PunchPoint is already running.", "PunchPoint",
