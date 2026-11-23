@@ -38,8 +38,8 @@ public class ReportTests
                 Assert.Equal("Hours Summary", table.Title);
                 Assert.Equal(2, table.Rows.Count); // employee + TOTAL
                 Assert.Equal("Tester, Report", table.Rows[0][0]);
-                Assert.Equal("9.00", table.Rows[0][6]);
-                Assert.Equal("9.00", table.Rows[1][6]);
+                Assert.Equal("9:00", table.Rows[0][6]);
+                Assert.Equal("9:00", table.Rows[1][6]);
             }
         }
         finally
@@ -107,5 +107,17 @@ public class PayPeriodLabelTests
         Assert.StartsWith("Next · ", PayPeriodLabels.Label(d, all, new DateTime(2026, 11, 20)));
         Assert.DoesNotContain("·", PayPeriodLabels.Label(a, all, new DateTime(2026, 11, 20)));
         Assert.Contains("Nov 11 – Nov 17, 2026", PayPeriodLabels.Label(b, all, new DateTime(2026, 11, 20)));
+    }
+}
+
+public class HoursFormatTests
+{
+    [Fact]
+    public void Minutes_format_reads_as_hours_and_minutes()
+    {
+        Assert.Equal("8:30", ReportBuilder.Hours(510, Core.Models.TotalsFormat.Minutes));
+        Assert.Equal("0:44", ReportBuilder.Hours(44, Core.Models.TotalsFormat.Minutes));
+        Assert.Equal("8.50", ReportBuilder.Hours(510, Core.Models.TotalsFormat.Hundredths));
+        Assert.Equal("0.73", ReportBuilder.Hours(44, Core.Models.TotalsFormat.Hundredths));
     }
 }

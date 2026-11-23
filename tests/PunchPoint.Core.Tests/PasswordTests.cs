@@ -114,6 +114,7 @@ public class ThemeSettingTests
             var store = new Store(database);
 
             Assert.Equal(Core.Models.AppTheme.System, store.GetSettings().Theme);
+            Assert.Equal(Core.Models.TotalsFormat.Minutes, store.GetSettings().TotalsFormat);
 
             var settings = store.GetSettings();
             settings.Theme = Core.Models.AppTheme.Dark;

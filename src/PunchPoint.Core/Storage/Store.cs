@@ -65,7 +65,7 @@ public sealed class Store
             MaxPunchSpanMinutes = r.GetInt("max_punch_span", 960),
             RequireApprovalBeforeExport = r.GetBool("require_approval"),
             RoundDailyTotalInsteadOfPunches = r.GetBool("round_daily_total"),
-            TotalsFormat = r.HasColumn("totals_format") ? (TotalsFormat)r.GetInt("totals_format", 1) : TotalsFormat.Hundredths,
+            TotalsFormat = r.HasColumn("totals_format") ? (TotalsFormat)r.GetInt("totals_format", 0) : TotalsFormat.Minutes,
             ShowPunchCommentDialog = !r.HasColumn("show_punch_comment") || r.GetBool("show_punch_comment", true),
             EnableSeventhDayOvertime = r.HasColumn("enable_7th_day_ot") && r.GetBool("enable_7th_day_ot"),
             Theme = r.HasColumn("app_theme") ? (AppTheme)r.GetInt("app_theme", 0) : AppTheme.System,

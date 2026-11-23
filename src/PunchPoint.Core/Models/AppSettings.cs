@@ -58,7 +58,7 @@ public sealed class AppSettings
     public bool RoundDailyTotalInsteadOfPunches { get; set; }
 
     /// <summary>How totals are displayed: minutes (8:30) or hundredths (8.50).</summary>
-    public TotalsFormat TotalsFormat { get; set; } = TotalsFormat.Hundredths;
+    public TotalsFormat TotalsFormat { get; set; } = TotalsFormat.Minutes;
 
     /// <summary>Ask for a comment when a punch is added manually (old timeQplus option).</summary>
     public bool ShowPunchCommentDialog { get; set; } = true;

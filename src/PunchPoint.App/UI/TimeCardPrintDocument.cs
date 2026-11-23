@@ -1,5 +1,6 @@
 using System.Drawing.Printing;
 using PunchPoint.Core.Models;
+using PunchPoint.Core.Reports;
 using PunchPoint.Core.TimeCalc;
 
 namespace PunchPoint.App.UI;
@@ -23,6 +24,12 @@ public sealed class TimeCardPrintDocument : PrintDocument
         base.OnBeginPrint(e);
         DefaultPageSettings.Landscape = false;
     }
+
+    private string Hours(int minutes) => ReportBuilder.Hours(minutes, _settings.TotalsFormat);
+
+    private string OvertimeOrDash(int minutes) => minutes == 0 ? "" : Hours(minutes);
+
+    private string HolidayOrDash(int minutes) => minutes == 0 ? "" : Hours(minutes);
 
     protected override void OnPrintPage(PrintPageEventArgs e)
     {
@@ -98,10 +105,10 @@ public sealed class TimeCardPrintDocument : PrintDocument
                 day.FirstInLabel,
                 day.LastOutLabel,
                 day.BreakMinutes > 0 ? day.BreakMinutes + "m" : "",
-                Fmt.Hours(day.RegularMinutes),
-                Fmt.HoursOrDash(day.OverTime1Minutes + day.OverTime2Minutes),
-                Fmt.HoursOrDash(day.HolidayMinutes),
-                Fmt.Hours(day.TotalMinutes),
+                Hours(day.RegularMinutes),
+                OvertimeOrDash(day.OverTime1Minutes + day.OverTime2Minutes),
+                HolidayOrDash(day.HolidayMinutes),
+                Hours(day.TotalMinutes),
             };
 
             for (int i = 0; i < values.Length; i++)
@@ -127,20 +134,20 @@ public sealed class TimeCardPrintDocument : PrintDocument
         y += 24;
 
         string totals =
-            $"Regular  {Fmt.Hours(_result.RegularMinutes)} h      " +
-            $"Overtime  {Fmt.Hours(_result.OverTime1Minutes + _result.OverTime2Minutes)} h      " +
-            $"Holiday  {Fmt.Hours(_result.HolidayMinutes)} h";
+            $"Regular  {Hours(_result.RegularMinutes)}      " +
+            $"Overtime  {Hours(_result.OverTime1Minutes + _result.OverTime2Minutes)}      " +
+            $"Holiday  {Hours(_result.HolidayMinutes)}";
         g.DrawString(totals, bodyFont, headerBrush, bounds.Left, y);
         y += 22;
 
         if (_result.AdjustmentMinutes != 0)
         {
-            g.DrawString($"Manual adjustment: {Fmt.Hours(_result.AdjustmentMinutes)} h", bodyFont, headerBrush, bounds.Left, y);
+            g.DrawString($"Manual adjustment: {Hours(_result.AdjustmentMinutes)}", bodyFont, headerBrush, bounds.Left, y);
             y += 22;
         }
 
         using var totalFont = new Font("Segoe UI", 13, FontStyle.Bold);
-        g.DrawString($"Total paid: {Fmt.Hours(_result.TotalMinutes)} hours", totalFont, headerBrush, bounds.Left, y);
+        g.DrawString($"Total paid: {Hours(_result.TotalMinutes)}", totalFont, headerBrush, bounds.Left, y);
         y += 40;
 
         g.DrawLine(linePen, bounds.Left, y, bounds.Left + 240, y);
