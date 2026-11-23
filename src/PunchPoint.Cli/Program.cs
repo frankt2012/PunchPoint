@@ -173,12 +173,11 @@ public static class Program
             Console.WriteLine($"Hours rows:   {preview.MiscHourTransactions} ({preview.MiscHoursTotal:0.##} h, excluded by default)");
         Console.WriteLine();
 
-        Console.WriteLine($"{"Employee",-28} {"Punches",7} {"First",-18} {"Last",-18} Notes");
+        Console.WriteLine($"{"Employee",-24} {"Punches",7}  {"First day (direction check)",-70} Notes");
         foreach (var row in preview.Employees.OrderBy(e => e.Employee.SortName))
         {
-            Console.WriteLine($"{Truncate(row.Employee.SortName, 28),-28} {row.PunchCount,7} " +
-                              $"{row.FirstPunch?.ToString("yyyy-MM-dd HH:mm"),-18} {row.LastPunch?.ToString("yyyy-MM-dd HH:mm"),-18} " +
-                              string.Join("; ", row.Notes));
+            Console.WriteLine($"{Truncate(row.Employee.SortName, 24),-24} {row.PunchCount,7}  " +
+                              $"{Truncate(row.FirstDaySummary, 70),-70} {string.Join("; ", row.Notes)}");
         }
 
         if (preview.Warnings.Count > 0)

@@ -49,6 +49,8 @@ public sealed class EmployeeImportRow
     public DateTime? LastPunch { get; set; }
     public int OpenShifts { get; set; }
     public int OddPunchDays { get; set; }
+    /// <summary>e.g. "Mon 11/9 8:01 IN, 17:02 OUT" - lets the user confirm direction detection.</summary>
+    public string FirstDaySummary { get; set; } = "";
     public List<string> Notes { get; } = new();
 }
 

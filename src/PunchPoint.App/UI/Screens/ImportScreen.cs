@@ -14,6 +14,7 @@ public sealed class ImportScreen : ScreenBase
     private readonly CheckBox _doSettings = Theme.Check("Copy company rules (overtime, rounding, day change)");
     private readonly CheckBox _doMisc = Theme.Check("Import paid hours (vacation / holiday / sick rows)");
     private readonly CheckBox _doApprovals = Theme.Check("Import approved time cards");
+    private readonly CheckBox _deactivateStale = Theme.Check("Deactivate employees with no punches in the last 90 days");
     private readonly CheckBox _useDates = Theme.Check("Only import punches in this date range");
     private readonly DateTimePicker _from = new() { Format = DateTimePickerFormat.Short, Width = 130, Font = Theme.Body };
     private readonly DateTimePicker _to = new() { Format = DateTimePickerFormat.Short, Width = 130, Font = Theme.Body };
@@ -96,7 +97,8 @@ public sealed class ImportScreen : ScreenBase
         _employeeGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Punches", FillWeight = 70 });
         _employeeGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "First punch", FillWeight = 120 });
         _employeeGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Last punch", FillWeight = 120 });
-        _employeeGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Notes", FillWeight = 260 });
+        _employeeGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "First day (direction check)", FillWeight = 300 });
+        _employeeGrid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Notes", FillWeight = 200 });
         _employeeGrid.Height = 240;
         _employeeGrid.Dock = DockStyle.Top;
 
@@ -122,7 +124,7 @@ public sealed class ImportScreen : ScreenBase
             FlowDirection = FlowDirection.TopDown,
             AutoSize = true,
             WrapContents = false,
-            Controls = { _doEmployees, _doSettings, _doMisc, _doApprovals },
+            Controls = { _doEmployees, _doSettings, _doMisc, _doApprovals, _deactivateStale },
         });
 
         var directionRow = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false };
@@ -432,6 +434,7 @@ public sealed class ImportScreen : ScreenBase
                     row.PunchCount,
                     row.FirstPunch?.ToString("MMM d, yyyy") ?? "",
                     row.LastPunch?.ToString("MMM d, yyyy") ?? "",
+                    row.FirstDaySummary,
                     string.Join("; ", row.Notes));
             }
 
@@ -475,6 +478,7 @@ public sealed class ImportScreen : ScreenBase
             ImportSettings = _doSettings.Checked,
             ImportMiscHours = _doMisc.Checked,
             ImportApprovals = _doApprovals.Checked,
+            InactiveAfterDaysWithoutPunch = _deactivateStale.Checked ? 90 : 0,
             ImportHolidays = true,
             ImportPayPeriods = true,
             ImportShifts = true,

@@ -119,6 +119,13 @@ public sealed class TimeQPlusImporter
                 row.LastPunch = list[^1].Timestamp;
                 row.OddPunchDays = list.GroupBy(t => t.Timestamp.Date).Count(g => g.Count() % 2 != 0);
 
+                var firstDay = list.GroupBy(t => t.Timestamp.Date).OrderBy(g => g.Key).First();
+                row.FirstDaySummary =
+                    $"{firstDay.Key:ddd M/d}: " +
+                    string.Join(", ", firstDay.OrderBy(t => t.Timestamp)
+                        .Take(8)
+                        .Select(t => $"{t.Timestamp:h:mm tt} {ShortKind(t.Kind)}"));
+
                 if (row.OddPunchDays > 0)
                     row.Notes.Add($"{row.OddPunchDays} day(s) with an odd number of punches (a missing punch).");
                 if (list.Count % 2 != 0)
@@ -162,6 +169,15 @@ public sealed class TimeQPlusImporter
 
         return preview;
     }
+
+    private static string ShortKind(PunchKind kind) => kind switch
+    {
+        PunchKind.In => "IN",
+        PunchKind.Out => "OUT",
+        PunchKind.BreakOut => "brk",
+        PunchKind.BreakIn => "back",
+        _ => "hrs",
+    };
 
     private static int SafeCount(Jet4Database db, string table)
     {
@@ -377,6 +393,26 @@ public sealed class TimeQPlusImporter
                         Paid = true,
                     });
                     result.HolidaysAdded++;
+                }
+            }
+
+            // --- optionally deactivate people with no recent punches ----
+            if (options.InactiveAfterDaysWithoutPunch > 0 && employeeMap.Count > 0)
+            {
+                var cutoff = DateTime.Now.AddDays(-options.InactiveAfterDaysWithoutPunch);
+                var lastPunch = transactions
+                    .GroupBy(t => t.Badge, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(g => g.Key, g => g.Max(t => t.Timestamp),
+                        StringComparer.OrdinalIgnoreCase);
+
+                foreach (var pair in employeeMap)
+                {
+                    bool recent = (pair.Value.Badge.Length > 0 &&
+                                   lastPunch.TryGetValue(pair.Value.Badge, out var when) && when >= cutoff);
+                    if (recent || pair.Value.Status == EmployeeStatus.Inactive) continue;
+
+                    pair.Value.Status = EmployeeStatus.Inactive;
+                    store.UpdateEmployee(pair.Value);
                 }
             }
 
