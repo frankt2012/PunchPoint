@@ -64,9 +64,6 @@ public class EmailSettingsTests
             Assert.Equal(587, reloaded.SmtpPort);
             Assert.True(reloaded.SmtpUseSsl);
             Assert.True(reloaded.EmailPeriodSummary);
-            s.WebBindAddress = "192.168.1.23";
-            store.SaveSettings(s);
-            Assert.Equal("192.168.1.23", store.GetSettings().WebBindAddress);
             Assert.True(EmailService.IsConfigured(reloaded));
         }
         finally

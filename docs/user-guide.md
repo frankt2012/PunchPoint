@@ -78,8 +78,9 @@ is taken from the old data.
 
 ## Appearance
 
-Settings → Company → **Appearance**: *Follow Windows* (default), *Light* or *Dark*. Changing it
-asks you to restart PunchPoint, and the employee clock picks it up the next time it starts.
+Settings → Company → **Dark mode**: *Follow Windows* (default), *Off — light theme* or
+*On — dark theme*. Off keeps the app light even when Windows is dark. Changing it asks you to
+restart PunchPoint, and the employee clock picks it up the next time it starts.
 
 In dark mode the window frame, drop-downs, lists, cards and grids all follow the palette.
 A few controls are drawn by Windows itself (the calendar on a date field and the scroll bars)
@@ -143,8 +144,8 @@ Settings → **Email reports**:
   password (Google: Account → Security → 2-Step Verification → App passwords).
 * **Send from** — the address the mail comes from (usually the same account).
 * **Send summaries to** — where the payroll summary should arrive.
-* Optionally tick **Encrypt stored passwords with Windows DPAPI** so the SMTP and web
-  passwords cannot be read from the database by another Windows account.
+* Optionally tick **Encrypt stored passwords with Windows DPAPI** so the SMTP password
+  cannot be read from the database by another Windows account.
 * Tick **Email a summary automatically when a pay period ends**.
 * Optionally tick **Also email each employee their own time card** — this needs an email
   address on each employee (Employees → Edit → Email).
@@ -155,41 +156,14 @@ Once a period has ended, the next time the clock (or the admin app) is running, 
 emails one PDF with every employee's regular, overtime and holiday hours. Each period is only
 sent once — the send is recorded in the database.
 
-### Checking hours from a phone
+### Checking hours away from the shop
 
-Settings → **Check hours from another device**:
+There is no web server in PunchPoint, so nothing is ever listening on your network. Remote
+checking happens through the **emailed summary**: once a pay period ends, the PDF arrives in
+your inbox (and optionally in each employee's).
 
-* Tick **Allow read-only web access on this PC**.
-* **Who can open it** — this is the important setting:
-  * `This PC only (127.0.0.1)` — the page never leaves this computer. Good for testing.
-  * `Local network — 192.168.1.23 (Wi-Fi)` — the page listens on that one address only. This
-    is what you want for a phone on the same Wi-Fi.
-  * `All networks (0.0.0.0)` — every network this PC is attached to, including any VPN.
-    Not recommended.
-* Choose a port (8080 is fine), a username and a **long password**.
-* Press **Test now** — it connects from this PC and tells you whether the page answered.
-* If a phone still cannot connect, press **Allow through firewall**. Windows asks for
-  permission and adds a rule for that port, limited to your local subnet and to private and
-  domain networks.
-
-Open the address shown under the fields (e.g. `http://192.168.1.23:8080`) on a phone or
-another PC on the same network. It shows who is currently clocked in and every employee's
-hours for the current period. It is **read-only** — no buttons, no editing, and it asks for
-the username and password every time.
-
-**Nothing is opened to the internet.** The app is a listener on one address; it never asks
-your router to forward anything and cannot be reached from outside your network. Because you
-choose the interface, a VPN adapter is not exposed either — pick your Wi-Fi/Ethernet address
-rather than "All networks".
-
-Notes:
-* The **clock must be running** for the page to be available (it is served by the clock; the
-  admin app also serves it while it is open).
-* A work VPN can block local traffic on some PCs — if the page works with the VPN disconnected
-  and not with it connected, that is the VPN client, not PunchPoint. Choosing the Wi-Fi address
-  usually avoids this.
-* The page is plain HTTP on your local network, so keep the password long.
-* Guest Wi-Fi networks often block devices from talking to each other; use the normal network.
+If you later want a live view from home, the safe way to add it is a private mesh such as
+Tailscale — no ports opened, encrypted end to end.
 
 ## Exports
 

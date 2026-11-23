@@ -1,7 +1,6 @@
 using PunchPoint.App.UI;
 using PunchPoint.Core.Security;
 using PunchPoint.Core.Storage;
-using PunchPoint.Core.Web;
 
 namespace PunchPoint.Clock;
 
@@ -75,28 +74,7 @@ internal static class Program
             });
             mailTimer.Start();
 
-            // Read-only hours page on the local network (optional).
-            WebReportServer? web = null;
-            if (settings.WebAccessEnabled)
-            {
-                web = new WebReportServer(database.Path, settings.WebAccessUser,
-                    SecretProtector.Unprotect(settings.WebAccessPassword), settings.WebAccessPort,
-                    settings.WebBindAddress);
-
-                if (!web.Start())
-                    store.Audit("Web access failed to start", web.LastError ?? "");
-                else
-                    store.Audit("Web access started", $"port {settings.WebAccessPort}");
-            }
-
-            try
-            {
-                Application.Run(new KioskForm(store, fullScreen));
-            }
-            finally
-            {
-                web?.Dispose();
-            }
+            Application.Run(new KioskForm(store, fullScreen));
             store.Audit("Clock closed", Environment.UserName);
         }
         catch (Exception ex)

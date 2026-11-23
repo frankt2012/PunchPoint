@@ -45,15 +45,7 @@ public sealed class SettingsScreen : ScreenBase
     private readonly CheckBox _emailEmployees = Theme.Check("Also email each employee their own time card (needs an email on the employee)");
     private readonly Label _emailStatus = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
     private readonly CheckBox _encryptSecrets = Theme.Check("Encrypt stored passwords with Windows DPAPI (recommended)");
-    private readonly CheckBox _webEnabled = Theme.Check("Allow read-only web access on this PC");
-    private readonly NumericUpDown _webPort = Number(1, 65535, 0, 80);
-    private readonly TextBox _webUser = Theme.Input(180);
-    private readonly TextBox _webPassword = Theme.Input(220);
-    private readonly Label _webHint = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
-    private readonly Label _webStatus = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted, MaximumSize = new Size(800, 0) };
-    private readonly ComboBox _webBind = Theme.Dropdown(430);
     private readonly Panel _emailCard;
-    private readonly Panel _webCard;
     private readonly DataGridView _shifts = new();
     private readonly DataGridView _holidays = new();
     private readonly Label _dataLabel = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
@@ -74,7 +66,6 @@ public sealed class SettingsScreen : ScreenBase
         stack.Add(BuildShiftCard());
         stack.Add(BuildHolidayCard());
         stack.Add(_emailCard = BuildEmailCard());
-        stack.Add(_webCard = BuildWebCard());
         stack.Add(BuildDataCard());
 
         _periodType.Items.AddRange(new object[] { "Weekly", "Bi-weekly", "Semi-monthly", "Monthly" });
@@ -117,20 +108,6 @@ public sealed class SettingsScreen : ScreenBase
         clockRow.Controls.Add(_clockMode);
         stack.Add(clockRow);
 
-        var appearanceRow = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 10, 0, 0) };
-        appearanceRow.Controls.Add(new Label
-        {
-            Text = "Appearance",
-            Width = 300,
-            AutoSize = false,
-            TextAlign = ContentAlignment.MiddleLeft,
-            Margin = new Padding(0, 8, 8, 0),
-            ForeColor = Theme.TextMuted,
-        });
-        _appearance.Items.AddRange(new object[] { "Follow Windows", "Light", "Dark" });
-        appearanceRow.Controls.Add(_appearance);
-        stack.Add(appearanceRow);
-
         stack.Add(new Label
         {
             Text = "Windowed is right for a shared PC. Use kiosk mode only on a PC that is used for nothing " +
@@ -141,6 +118,30 @@ public sealed class SettingsScreen : ScreenBase
             AutoSize = true,
             MaximumSize = new Size(760, 0),
             Margin = new Padding(0, 2, 0, 0),
+        });
+
+        var appearanceRow = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 10, 0, 0) };
+        appearanceRow.Controls.Add(new Label
+        {
+            Text = "Dark mode",
+            Width = 300,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0, 8, 8, 0),
+            ForeColor = Theme.TextMuted,
+        });
+        _appearance.Items.AddRange(new object[] { "Follow Windows", "Off — light theme", "On — dark theme" });
+        appearanceRow.Controls.Add(_appearance);
+        stack.Add(appearanceRow);
+
+        stack.Add(new Label
+        {
+            Text = "Off keeps the app light even when Windows is dark. The employee clock uses the same setting " +
+                   "the next time it starts.",
+            Font = Theme.Small,
+            ForeColor = Theme.TextMuted,
+            AutoSize = true,
+            MaximumSize = new Size(780, 0),
         });
 
         card.Controls.Add(stack);
@@ -269,9 +270,6 @@ public sealed class SettingsScreen : ScreenBase
     /// <summary>Diagnostics: bring the email card into view for a screenshot.</summary>
     public void ScrollToEmailCard() => RevealCard(_emailCard);
 
-    /// <summary>Diagnostics: bring the web card into view for a screenshot.</summary>
-    public void ScrollToWebCard() => RevealCard(_webCard);
-
     private void RevealCard(Panel card)
     {
         Body.PerformLayout();
@@ -357,235 +355,7 @@ public sealed class SettingsScreen : ScreenBase
         s.EncryptSecrets = _encryptSecrets.Checked;
         s.SmtpPassword = SecretProtector.Protect(_smtpPassword.Text, s.EncryptSecrets);
 
-        s.WebAccessEnabled = _webEnabled.Checked;
-        s.WebAccessPort = (int)_webPort.Value;
-        s.WebAccessUser = _webUser.Text.Trim();
-        s.WebAccessPassword = SecretProtector.Protect(_webPassword.Text, s.EncryptSecrets);
-        s.WebBindAddress = SelectedBindAddress();
         return s;
-    }
-
-    /// <summary>One selectable network address for the read-only page.</summary>
-    private sealed record BindChoice(string Label, string Address)
-    {
-        public override string ToString() => Label;
-    }
-
-    private static List<BindChoice> BindChoices()
-    {
-        var list = new List<BindChoice> { new("This PC only (127.0.0.1)", "127.0.0.1") };
-
-        try
-        {
-            foreach (var nic in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()
-                         .Where(n => n.OperationalStatus == System.Net.NetworkInformation.OperationalStatus.Up)
-                         .Where(n => n.NetworkInterfaceType != System.Net.NetworkInformation.NetworkInterfaceType.Loopback)
-                         .OrderBy(n => n.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Wireless80211 ? 0 : 1))
-            {
-                foreach (var unicast in nic.GetIPProperties().UnicastAddresses
-                             .Where(a => a.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork))
-                {
-                    list.Add(new BindChoice(
-                        $"Local network — {unicast.Address} ({ShortAdapterName(nic)})",
-                        unicast.Address.ToString()));
-                }
-            }
-        }
-        catch
-        {
-            // Fall through with just the local option.
-        }
-
-        list.Add(new BindChoice("All networks (0.0.0.0) — not recommended", "0.0.0.0"));
-        return list;
-    }
-
-    private static string ShortAdapterName(System.Net.NetworkInformation.NetworkInterface nic)
-    {
-        string name = nic.Name;
-        if (name.Length <= 22) return name;
-        return nic.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Wireless80211
-            ? "Wi-Fi"
-            : "network";
-    }
-
-    private Panel BuildWebCard()
-    {
-        var card = Theme.Card();
-        var stack = new StackPanel(8);
-        stack.Add(SectionTitle("Check hours from another device"));
-
-        stack.Add(new Label
-        {
-            Text = "While the clock is running, PunchPoint can serve a read-only page: who is on the clock " +
-                   "and this period's hours. It cannot change anything.",
-            Font = Theme.Small,
-            ForeColor = Theme.TextMuted,
-            AutoSize = true,
-            MaximumSize = new Size(780, 0),
-        });
-
-        stack.Add(Row("", _webEnabled));
-
-        _webBind.Items.AddRange(BindChoices().ToArray());
-        stack.Add(Row("Who can open it", _webBind));
-
-        stack.Add(new Label
-        {
-            Text = "The page only listens on the address chosen above — nothing is opened to the internet, " +
-                   "and nothing on your VPN or other networks can reach it. Pick your Wi-Fi or Ethernet " +
-                   "address to use it from a phone on the same network; choose 'This PC only' to keep it local.",
-            Font = Theme.Small,
-            ForeColor = Theme.TextMuted,
-            AutoSize = true,
-            MaximumSize = new Size(780, 0),
-        });
-
-        stack.Add(Row("Port", _webPort));
-        stack.Add(Row("Username", _webUser));
-        _webPassword.UseSystemPasswordChar = true;
-        stack.Add(Row("Password", _webPassword));
-
-        stack.Add(_webHint);
-
-        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 4, 0, 0) };
-        var test = Theme.SecondaryButton("Test now", 110);
-        test.Click += (_, _) => TestWebAccess();
-        buttons.Controls.Add(test);
-
-        var firewall = Theme.SecondaryButton("Allow through firewall", 190);
-        firewall.Margin = new Padding(6, 0, 0, 0);
-        firewall.Click += (_, _) => AllowThroughFirewall();
-        buttons.Controls.Add(firewall);
-        stack.Add(buttons);
-        stack.Add(_webStatus);
-
-        stack.Add(new Label
-        {
-            Text = "Traffic is plain HTTP on your own network, so use a long password. If a phone on the same " +
-                   "Wi-Fi still cannot connect, use 'Allow through firewall' (Windows asks for permission) — a " +
-                   "work VPN can also block local traffic until you disconnect it.",
-            Font = Theme.Small,
-            ForeColor = Theme.TextMuted,
-            AutoSize = true,
-            MaximumSize = new Size(780, 0),
-        });
-
-        card.Controls.Add(stack);
-        return card;
-    }
-
-    private static string WebAddressHint(string bind, int port)
-    {
-        if (bind is "" or "0.0.0.0" or "127.0.0.1")
-            return $"Open on this PC: http://127.0.0.1:{port}  (not reachable from a phone)";
-
-        return $"Open: http://{bind}:{port}";
-    }
-
-    private string SelectedBindAddress() =>
-        (_webBind.SelectedItem as BindChoice)?.Address ?? "127.0.0.1";
-
-    private void TestWebAccess()
-    {
-        string address = SelectedBindAddress();
-        string target = address is "0.0.0.0" or "" ? "127.0.0.1" : address;
-        int port = (int)_webPort.Value;
-
-        try
-        {
-            using var client = new System.Net.Sockets.TcpClient();
-
-            var connect = client.ConnectAsync(target, port);
-            if (!connect.Wait(TimeSpan.FromSeconds(2)))
-            {
-                _webStatus.Text = $"No answer from {target}:{port}. Start the employee clock (or this app) — " +
-                                  "the page is served by the running app.";
-                _webStatus.ForeColor = Theme.Danger;
-                return;
-            }
-
-            using var stream = client.GetStream();
-            stream.ReadTimeout = 3000;
-
-            string auth = Convert.ToBase64String(
-                System.Text.Encoding.UTF8.GetBytes($"{_webUser.Text.Trim()}:{_webPassword.Text}"));
-
-            string request =
-                "GET /health HTTP/1.1\r\n" +
-                $"Host: {target}:{port}\r\n" +
-                $"Authorization: Basic {auth}\r\n" +
-                "Connection: close\r\n\r\n";
-
-            byte[] bytes = System.Text.Encoding.ASCII.GetBytes(request);
-            stream.Write(bytes, 0, bytes.Length);
-
-            using var reader = new System.IO.StreamReader(stream);
-            string? status = reader.ReadLine() ?? "";
-
-            if (status.Contains(" 200"))
-            {
-                _webStatus.Text = $"Working — the page answered at http://{target}:{port}. " +
-                                  "Open that address on a device on the same network.";
-                _webStatus.ForeColor = Theme.Success;
-            }
-            else if (status.Contains(" 401"))
-            {
-                _webStatus.Text = "The page is running but rejected the username and password above.";
-                _webStatus.ForeColor = Theme.Danger;
-            }
-            else
-            {
-                _webStatus.Text = $"Unexpected reply from the page: {status}";
-                _webStatus.ForeColor = Theme.Danger;
-            }
-        }
-        catch (Exception ex)
-        {
-            _webStatus.Text = $"Could not reach {target}:{port} — {ex.Message}";
-            _webStatus.ForeColor = Theme.Danger;
-        }
-    }
-
-    private void AllowThroughFirewall()
-    {
-        int port = (int)_webPort.Value;
-        string rule = $"PunchPoint web {port}";
-
-        string command =
-            $"netsh advfirewall firewall delete rule name=\"{rule}\" >nul 2>&1 & " +
-            $"netsh advfirewall firewall add rule name=\"{rule}\" dir=in action=allow protocol=TCP " +
-            $"localport={port} profile=private,domain remoteip=localsubnet";
-
-        try
-        {
-            var process = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                Arguments = "/c " + command,
-                Verb = "runas",
-                UseShellExecute = true,
-                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
-            });
-
-            if (process is null)
-            {
-                _webStatus.Text = "Firewall rule was cancelled.";
-                _webStatus.ForeColor = Theme.Danger;
-                return;
-            }
-
-            process.WaitForExit(10_000);
-            _webStatus.Text = process.ExitCode == 0
-                ? $"Windows Firewall now allows port {port} from this local network only."
-                : "The firewall command did not complete — Windows may have blocked it.";
-            _webStatus.ForeColor = process.ExitCode == 0 ? Theme.Success : Theme.Danger;
-        }
-        catch (Exception ex)
-        {
-            _webStatus.Text = "Could not change the firewall: " + ex.Message;
-            _webStatus.ForeColor = Theme.Danger;
-        }
     }
 
     private Panel BuildDataCard()
@@ -683,16 +453,6 @@ public sealed class SettingsScreen : ScreenBase
         _encryptSecrets.Checked = s.EncryptSecrets;
         _smtpPassword.Text = SecretProtector.Unprotect(s.SmtpPassword);
 
-        _webEnabled.Checked = s.WebAccessEnabled;
-        _webPort.Value = Math.Clamp(s.WebAccessPort, 1, 65535);
-        _webUser.Text = s.WebAccessUser;
-        _webPassword.Text = SecretProtector.Unprotect(s.WebAccessPassword);
-
-        string bind = string.IsNullOrWhiteSpace(s.WebBindAddress) ? "127.0.0.1" : s.WebBindAddress;
-        int index = _webBind.Items.Cast<BindChoice>().ToList().FindIndex(c => c.Address == bind);
-        _webBind.SelectedIndex = index >= 0 ? index : 0;
-
-        _webHint.Text = WebAddressHint(bind, s.WebAccessPort);
         _appearance.SelectedIndex = (int)s.Theme;
         _passwordStatus.Text = string.IsNullOrWhiteSpace(s.AdminPasswordHash)
             ? "  not set — the admin app is currently unprotected"
@@ -864,11 +624,6 @@ public sealed class SettingsScreen : ScreenBase
         s.EncryptSecrets = _encryptSecrets.Checked;
         s.SmtpPassword = SecretProtector.Protect(_smtpPassword.Text, s.EncryptSecrets);
 
-        s.WebAccessEnabled = _webEnabled.Checked;
-        s.WebAccessPort = (int)_webPort.Value;
-        s.WebAccessUser = _webUser.Text.Trim();
-        s.WebAccessPassword = SecretProtector.Protect(_webPassword.Text, s.EncryptSecrets);
-        s.WebBindAddress = SelectedBindAddress();
         s.ShowPunchCommentDialog = _punchComment.Checked;
         s.RequireApprovalBeforeExport = _requireApproval.Checked;
 

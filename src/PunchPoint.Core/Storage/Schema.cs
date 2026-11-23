@@ -109,27 +109,14 @@ public static class Schema
 
         if (version < 8)
         {
-            foreach (var sql in new[]
-                     {
-                         "ALTER TABLE settings ADD COLUMN encrypt_secrets INTEGER NOT NULL DEFAULT 0;",
-                         "ALTER TABLE settings ADD COLUMN web_access INTEGER NOT NULL DEFAULT 0;",
-                         "ALTER TABLE settings ADD COLUMN web_port INTEGER NOT NULL DEFAULT 8080;",
-                         "ALTER TABLE settings ADD COLUMN web_user TEXT NOT NULL DEFAULT 'punchpoint';",
-                         "ALTER TABLE settings ADD COLUMN web_password TEXT NOT NULL DEFAULT '';",
-                     })
-            {
-                try { db.Execute(sql); } catch { /* already present */ }
-            }
+            try { db.Execute("ALTER TABLE settings ADD COLUMN encrypt_secrets INTEGER NOT NULL DEFAULT 0;"); }
+            catch { /* already present */ }
             SetVersion(db, 8);
         }
 
-        if (version < 9)
-        {
-            // Bind the web page to one address instead of every interface.
-            try { db.Execute("ALTER TABLE settings ADD COLUMN web_bind_ip TEXT NOT NULL DEFAULT '';"); }
-            catch { /* already present */ }
-            SetVersion(db, 9);
-        }
+        // Version 9 was the network page, which has been removed. Older databases may still
+        // carry its unused columns; nothing reads them now.
+        if (version < 9) SetVersion(db, 9);
     }
 
     private static int GetVersion(Database db)

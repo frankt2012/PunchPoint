@@ -43,11 +43,6 @@ behaviour were written from scratch (see [NOTICE.md](NOTICE.md)).
 | Terminal | **Import** — reads the old timeQplus database and archives |
 | Employee Transaction | **PunchPointClock.exe** — a locked-down full-screen clock |
 
-The clock can also serve a **read-only page on one chosen network address** (`http://<pc>:8080`)
-so you can check hours from a phone or another PC without remote access to Windows. It binds
-to a single interface you pick (local-only, Wi-Fi/Ethernet, or all), so a VPN is never exposed,
-and it is protected by a username and password. It cannot change anything.
-
 Reports can be saved as **PDF** (built in, no external tools) and the payroll summary can be
 **emailed automatically at the end of each pay period** — useful when you want to check hours
 from home without remote access to the PC.
@@ -74,7 +69,6 @@ self-contained executable with no runtime to install.
 | **Reports** | Ten reports with preview, print and CSV export |
 | **Export** | Payroll, generic ASCII, daily detail, punches, QuickBooks-friendly files, PDF |
 | **Email** | Payroll summary PDF when a pay period ends, optionally a time card to each employee |
-| **Web view** | Read-only page on your shop network: who is in, and this period's hours, from a phone |
 | **Settings** | Pay periods, rounding, overtime, day-change, shifts, holidays, appearance, backups |
 
 ## Two programs

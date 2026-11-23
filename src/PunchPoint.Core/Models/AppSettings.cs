@@ -100,20 +100,6 @@ public sealed class AppSettings
     /// <summary>Encrypt stored passwords with Windows DPAPI (per Windows account).</summary>
     public bool EncryptSecrets { get; set; }
 
-    /// <summary>Serve the read-only hours page on the local network (from the clock).</summary>
-    public bool WebAccessEnabled { get; set; }
-    public int WebAccessPort { get; set; } = 8080;
-    public string WebAccessUser { get; set; } = "punchpoint";
-    public string WebAccessPassword { get; set; } = "";
-
-    /// <summary>
-    /// Which network interface the read-only page listens on. Empty or "127.0.0.1" means
-    /// this PC only; a specific address means that interface only; "0.0.0.0" means every
-    /// interface (not recommended). A single address keeps VPN adapters and other networks
-    /// out entirely.
-    /// </summary>
-    public string WebBindAddress { get; set; } = "";
-
     public string LastBackupPath { get; set; } = "";
     public int SchemaVersion { get; set; } = 1;
 }

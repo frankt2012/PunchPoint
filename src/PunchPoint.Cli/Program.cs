@@ -30,7 +30,6 @@ public static class Program
                 "demo" => Demo(args[1..]),
                 "doctor" => Doctor(args[1..]),
                 "pdf" => Pdf(args[1..]),
-                "serve" => Serve(args[1..]),
                 "help" or "-h" or "--help" => Usage(),
                 _ => Unknown(args[0]),
             };
@@ -70,9 +69,6 @@ public static class Program
                 --no-settings           Do not copy company rules
                 --misc-hours            Import transactions that carry hours (vacation etc.)
                 --reset                 Delete the target database first
-
-            Web (read-only hours page)
-              punchpoint serve [--db <file>] [--port 8080] [--user u --pass p]
 
             Reporting
               punchpoint pdf <out.pdf> [--db <file>] [--period <n>]   Hours summary as PDF
@@ -405,41 +401,6 @@ public static class Program
     }
 
     private static string Fmt(int minutes) => (minutes / 60.0).ToString("0.00");
-
-    private static int Serve(string[] args)
-    {
-        string? dbPath = null;
-        int port = 8080;
-        string user = "punchpoint", pass = "";
-
-        for (int i = 0; i < args.Length; i++)
-        {
-            switch (args[i])
-            {
-                case "--db": dbPath = args[++i]; break;
-                case "--port": port = int.Parse(args[++i]); break;
-                case "--user": user = args[++i]; break;
-                case "--pass": pass = args[++i]; break;
-            }
-        }
-
-        using var database = dbPath is null ? Database.OpenDefault() : Database.Open(dbPath);
-        var store = new Store(database);
-        var settings = store.GetSettings();
-        if (pass.Length == 0) pass = PunchPoint.Core.Security.SecretProtector.Unprotect(settings.WebAccessPassword);
-        if (args.Length == 0) port = settings.WebAccessPort;
-
-        using var server = new PunchPoint.Core.Web.WebReportServer(database.Path, user, pass, port);
-        if (!server.Start())
-        {
-            Console.Error.WriteLine("Could not start: " + server.LastError);
-            return 1;
-        }
-
-        Console.WriteLine($"Serving http://0.0.0.0:{port}  (user {user}) — Ctrl+C to stop");
-        Thread.Sleep(Timeout.Infinite);
-        return 0;
-    }
 
     private static int Pdf(string[] args)
     {
