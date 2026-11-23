@@ -117,6 +117,18 @@ public sealed class ClockService
     public Punch Punch(Employee employee, PunchKind kind, DateTime timestamp, string comment = "",
         PunchSource source = PunchSource.Clock)
     {
+        // Guard against out-of-order break punches (double clicks, stale screens).
+        if (kind is PunchKind.BreakOut or PunchKind.BreakIn)
+        {
+            var state = GetStatus(employee, timestamp);
+            if (kind == PunchKind.BreakOut && !state.IsClockedIn)
+                throw new InvalidOperationException($"{employee.DisplayName} is not clocked in, so a break cannot be started.");
+            if (kind == PunchKind.BreakOut && state.OnBreak)
+                throw new InvalidOperationException($"{employee.DisplayName} is already on a break.");
+            if (kind == PunchKind.BreakIn && !state.OnBreak)
+                throw new InvalidOperationException($"{employee.DisplayName} is not on a break.");
+        }
+
         var period = _store.GetPayPeriodFor(timestamp);
         var punch = new Punch
         {

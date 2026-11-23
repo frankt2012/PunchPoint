@@ -363,3 +363,34 @@ public class SeventhDayOvertimeTests
         Assert.Equal(0, result.OverTime1Minutes);
     }
 }
+
+public class OrphanBreakTests
+{
+    [Fact]
+    public void Break_after_clock_out_is_ignored_with_one_note_and_no_time_change()
+    {
+        var settings = new AppSettings();
+        var period = new PayPeriod
+        {
+            Start = new DateTime(2026, 11, 23),
+            End = new DateTime(2026, 11, 29),
+            Type = PayPeriodType.Weekly,
+        };
+        var employee = new Employee { Id = 1, FirstName = "Frank", LastName = "Triolo", Pin = "1" };
+
+        var punches = new List<Punch>
+        {
+            new() { EmployeeId = 1, Timestamp = new DateTime(2026, 11, 23, 8, 0, 0), Kind = PunchKind.In },
+            new() { EmployeeId = 1, Timestamp = new DateTime(2026, 11, 23, 12, 0, 0), Kind = PunchKind.Out },
+            new() { EmployeeId = 1, Timestamp = new DateTime(2026, 11, 23, 12, 5, 0), Kind = PunchKind.BreakOut },
+            new() { EmployeeId = 1, Timestamp = new DateTime(2026, 11, 23, 12, 10, 0), Kind = PunchKind.BreakIn },
+        };
+
+        var result = TimeCardCalculator.Calculate(employee, null, period, punches, settings);
+
+        Assert.Equal(240, result.RegularMinutes);
+        Assert.Single(result.Issues);
+        Assert.Contains("ignored", result.Issues[0]);
+        Assert.Contains("No hours were affected", result.Issues[0]);
+    }
+}

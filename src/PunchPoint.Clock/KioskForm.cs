@@ -39,6 +39,7 @@ public sealed class KioskForm : Form
     private Employee? _selected;
     private DateTime _resetAt;
     private bool _allowClose;
+    private bool _punching;
     private bool _hasEmployees;
     private AppSettings _settings;
 
@@ -423,8 +424,9 @@ public sealed class KioskForm : Form
 
     private void PerformPunch(PunchKind kind)
     {
-        if (_selected is null) return;
+        if (_selected is null || _punching) return;
 
+        _punching = true;
         try
         {
             var now = DateTime.Now;
@@ -454,12 +456,14 @@ public sealed class KioskForm : Form
         catch (Exception ex)
         {
             PromptDialog.Warn(this, ex.Message);
+            _punching = false;
             Reset();
         }
     }
 
     private void Reset()
     {
+        _punching = false;
         _selected = null;
         _pin.Clear();
         _pinError.Text = "";

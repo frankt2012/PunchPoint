@@ -173,6 +173,7 @@ public static class TimeCardCalculator
 
             WorkSegment? open = null;
             DateTime? breakStart = null;
+            var breakNoteAdded = new HashSet<DateTime>();
 
             void CloseOpen(string reason)
             {
@@ -222,8 +223,14 @@ public static class TimeCardCalculator
                     case PunchKind.BreakOut:
                         if (open is null)
                         {
-                            builds.Add(new SegmentBuild(workDate, null,
-                                new[] { $"Break OUT at {punch.Timestamp:h:mm tt} has no open IN and was ignored." }));
+                            // Usually a double click on the clock: no shift is open, so the break
+                            // has no effect. Say it once per day, not once per punch.
+                            if (breakNoteAdded.Add(workDate))
+                                builds.Add(new SegmentBuild(workDate, null, new[]
+                                {
+                                    $"Break punches near {punch.Timestamp:h:mm tt} were ignored because the employee " +
+                                    "was not clocked in at that moment. No hours were affected."
+                                }));
                             break;
                         }
                         breakStart = punch.Timestamp;
@@ -232,8 +239,12 @@ public static class TimeCardCalculator
                     case PunchKind.BreakIn:
                         if (open is null || breakStart is null)
                         {
-                            builds.Add(new SegmentBuild(workDate, null,
-                                new[] { $"Break IN at {punch.Timestamp:h:mm tt} without a matching break OUT was ignored." }));
+                            if (breakNoteAdded.Add(workDate))
+                                builds.Add(new SegmentBuild(workDate, null, new[]
+                                {
+                                    $"Break punches near {punch.Timestamp:h:mm tt} were ignored because the employee " +
+                                    "was not clocked in at that moment. No hours were affected."
+                                }));
                             break;
                         }
 

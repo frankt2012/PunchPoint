@@ -141,3 +141,39 @@ public class ClockServiceTests
         }
     }
 }
+
+public class BreakValidationTests
+{
+    [Fact]
+    public void Break_punches_are_rejected_when_not_clocked_in()
+    {
+        string path = TestPaths.NewDatabasePath();
+        try
+        {
+            using var database = Database.Open(path);
+            var store = new Store(database);
+            var clock = new ClockService(store);
+            var employee = new Employee { FirstName = "Break", LastName = "Test", Pin = "1" };
+            store.InsertEmployee(employee);
+
+            var day = new DateTime(2026, 11, 23);
+            Assert.Throws<InvalidOperationException>(() =>
+                clock.Punch(employee, PunchKind.BreakOut, day.AddHours(9)));
+
+            clock.Punch(employee, PunchKind.In, day.AddHours(8));
+            Assert.Throws<InvalidOperationException>(() =>
+                clock.Punch(employee, PunchKind.BreakIn, day.AddHours(10)));
+
+            clock.Punch(employee, PunchKind.BreakOut, day.AddHours(12));
+            Assert.Throws<InvalidOperationException>(() =>
+                clock.Punch(employee, PunchKind.BreakOut, day.AddHours(12).AddMinutes(1)));
+        }
+        finally
+        {
+            foreach (string suffix in new[] { "", "-wal", "-shm" })
+            {
+                try { File.Delete(path + suffix); } catch { }
+            }
+        }
+    }
+}
