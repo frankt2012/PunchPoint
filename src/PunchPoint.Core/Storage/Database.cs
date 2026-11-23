@@ -125,8 +125,13 @@ public sealed class Database : IDisposable
         string dir = destinationDirectory ?? AppPaths.BackupsDirectory;
         Directory.CreateDirectory(dir);
 
-        string target = System.IO.Path.Combine(dir,
-            $"{System.IO.Path.GetFileNameWithoutExtension(Path)}-{DateTime.Now:yyyyMMdd-HHmmss}.db");
+        string baseName = $"{System.IO.Path.GetFileNameWithoutExtension(Path)}-{DateTime.Now:yyyyMMdd-HHmmss}";
+        string target = System.IO.Path.Combine(dir, baseName + ".db");
+
+        // Two launches inside the same second must not collide.
+        int suffix = 1;
+        while (File.Exists(target))
+            target = System.IO.Path.Combine(dir, $"{baseName}-{suffix++}.db");
 
         using (var cmd = _connection.CreateCommand())
         {

@@ -27,6 +27,7 @@ public static class Program
                 "import" => Import(args[1..]),
                 "timecards" => TimeCards(args[1..]),
                 "demo" => Demo(args[1..]),
+                "doctor" => Doctor(args[1..]),
                 "help" or "-h" or "--help" => Usage(),
                 _ => Unknown(args[0]),
             };
@@ -68,6 +69,7 @@ public static class Program
 
             Verification
               punchpoint timecards [--db <file>] [--period <n>]   Print computed time cards
+              punchpoint doctor [--db <file>]                     Startup path + integrity check
               punchpoint demo [--db <file>]                       Seed demo data for a quick look
 
             """);
@@ -326,6 +328,24 @@ public static class Program
     }
 
     private static string Fmt(int minutes) => (minutes / 60.0).ToString("0.00");
+
+    private static int Doctor(string[] args)
+    {
+        string? dbPath = null;
+        for (int i = 0; i < args.Length; i++)
+            if (args[i] == "--db") dbPath = args[++i];
+
+        using var database = dbPath is null ? Database.OpenDefault() : Database.Open(dbPath);
+        var store = new Store(database);
+
+        int _ = Maintenance.EnsurePeriods(store);
+        string? backup = Maintenance.DailyBackup(database);
+
+        Console.WriteLine(Maintenance.Describe(store));
+        Console.WriteLine($"Backup:        {backup ?? "(already taken today)"}");
+        Console.WriteLine($"Integrity:     {Maintenance.IntegrityCheck(store)}");
+        return 0;
+    }
 
     private static int Demo(string[] args)
     {

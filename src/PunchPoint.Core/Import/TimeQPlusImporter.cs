@@ -580,7 +580,14 @@ public sealed class TimeQPlusImporter
             void Add(string? key)
             {
                 if (string.IsNullOrWhiteSpace(key)) return;
-                lookup.TryAdd(key.Trim(), id);
+                string trimmed = key.Trim();
+                lookup.TryAdd(trimmed, id);
+
+                // Also match loosely: badges are often stored as 0012 in one place and
+                // 12 in another, and terminals sometimes pad values with spaces.
+                string normalized = Normalize(trimmed);
+                if (normalized.Length > 0)
+                    lookup.TryAdd("#" + normalized, id);
             }
 
             Add(legacy.Employee.Badge);
@@ -594,10 +601,34 @@ public sealed class TimeQPlusImporter
 
     internal static int ResolveEmployeeId(LegacyTransaction transaction, Dictionary<string, int> lookup)
     {
-        if (!string.IsNullOrWhiteSpace(transaction.Badge) &&
-            lookup.TryGetValue(transaction.Badge.Trim(), out int id))
+        if (string.IsNullOrWhiteSpace(transaction.Badge))
+            return -1;
+
+        string badge = transaction.Badge.Trim();
+
+        if (lookup.TryGetValue(badge, out int id))
             return id;
+
+        string normalized = Normalize(badge);
+        if (normalized.Length > 0 && lookup.TryGetValue("#" + normalized, out id))
+            return id;
+
         return -1;
+    }
+
+    /// <summary>Lower-cases and strips leading zeros so 0012 and 12 are the same badge.</summary>
+    internal static string Normalize(string value)
+    {
+        value = new string(value.Where(c => !char.IsWhiteSpace(c)).ToArray());
+        if (value.Length == 0) return "";
+
+        if (value.All(char.IsDigit))
+        {
+            string trimmed = value.TrimStart('0');
+            return trimmed.Length == 0 ? "0" : trimmed;
+        }
+
+        return value.ToLowerInvariant();
     }
 
     // =================================================================

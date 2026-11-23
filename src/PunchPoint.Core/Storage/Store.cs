@@ -386,6 +386,23 @@ public sealed class Store
 
     public int CountPunches() => Convert.ToInt32(_db.Scalar("SELECT COUNT(*) FROM punches;"));
 
+    /// <summary>Earliest and latest punch timestamps, or null when there are none.</summary>
+    public (DateTime Min, DateTime Max)? GetPunchDateRange()
+    {
+        return _db.Query("""
+            SELECT MIN(timestamp) AS mn, MAX(timestamp) AS mx
+            FROM punches WHERE is_voided = 0;
+            """, r =>
+        {
+            string? min = r.GetStringOrNull("mn");
+            string? max = r.GetStringOrNull("mx");
+            if (min is null || max is null) return ((DateTime?)null, (DateTime?)null);
+            return (ParseTimestamp(min), ParseTimestamp(max));
+        }).FirstOrDefault() is var (mn, mx) && mn is not null && mx is not null
+            ? (mn.Value, mx.Value)
+            : null;
+    }
+
     public Punch? FindPunchByLegacyId(int legacyId) =>
         _db.Query("SELECT * FROM punches WHERE legacy_id = $id LIMIT 1;", MapPunch, ("$id", legacyId)).FirstOrDefault();
 

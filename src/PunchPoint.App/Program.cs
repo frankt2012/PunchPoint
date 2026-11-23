@@ -40,10 +40,10 @@ internal static class Program
             var store = new Store(database);
 
             // A daily safety copy, kept for 30 days. Cheap insurance on a work PC.
-            MakeDailyBackup(database);
+            Maintenance.DailyBackup(database);
 
             // Always have a period covering today so the first screen is useful.
-            EnsureCurrentPeriods(store);
+            Maintenance.EnsurePeriods(store);
 
             var services = new AppServices(store);
             Application.Run(new MainForm(services));
@@ -52,46 +52,6 @@ internal static class Program
         catch (Exception ex)
         {
             ReportFatal(ex);
-        }
-    }
-
-    private static void EnsureCurrentPeriods(Store store)
-    {
-        try
-        {
-            var settings = store.GetSettings();
-            foreach (var period in PunchPoint.Core.TimeCalc.PayPeriodGenerator.EnsureRange(
-                         settings, DateTime.Today.AddMonths(-2), DateTime.Today.AddMonths(3)))
-            {
-                store.UpsertPayPeriod(period);
-            }
-        }
-        catch
-        {
-            // never block startup
-        }
-    }
-
-    private static void MakeDailyBackup(Database database)
-    {
-        try
-        {
-            var backups = Directory.GetFiles(AppPaths.BackupsDirectory, "punchpoint-*.db");
-            string today = $"punchpoint-{DateTime.Now:yyyyMMdd}.db";
-            string target = Path.Combine(AppPaths.BackupsDirectory, today);
-
-            if (!File.Exists(target) && new FileInfo(database.Path).Length > 4096)
-                database.Backup();
-
-            foreach (var file in backups)
-            {
-                if (File.GetLastWriteTime(file) < DateTime.Now.AddDays(-30))
-                    File.Delete(file);
-            }
-        }
-        catch
-        {
-            // A backup failure must never stop the app from starting.
         }
     }
 
