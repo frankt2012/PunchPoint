@@ -178,6 +178,16 @@ open **Import** and choose the CSV/TXT file.
   the old manual "carry" fields are not carried forward. Manual corrections are done with
   **Adjust hours** on the Time Cards screen.
 
+## Releasing an update
+
+```bash
+scripts/release.sh 1.6.0
+```
+
+That sets the version, runs the tests, commits, tags `v1.6.0` and pushes. GitHub Actions builds
+the x64 and ARM64 installers on Windows and attaches them to the release. Running copies of the
+app check that release once a day and offer it with its notes — nothing installs itself.
+
 ## Building
 
 Requires the .NET SDK 11 (or 10 with the target framework changed to `net10.0-windows`).
