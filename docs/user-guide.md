@@ -76,6 +76,23 @@ periods never changes punches.
 If you import from timeQplus, the old period boundaries are reproduced, and the period type
 is taken from the old data.
 
+## Appearance
+
+Settings → Company → **Appearance**: *Follow Windows* (default), *Light* or *Dark*. Changing it
+asks you to restart PunchPoint, and the employee clock picks it up the next time it starts.
+
+## Pay periods in drop-downs
+
+Every period list marks the one containing today as **Current**, the period before it as
+**Previous** and the one after it as **Next**, for example:
+
+```
+Current · Nov 18 – Nov 24, 2026
+Previous · Nov 11 – Nov 17, 2026
+Nov 4 – Nov 10, 2026
+Oct 28 – Nov 3, 2026
+```
+
 ## Overtime and rounding
 
 Settings → **Rounding and overtime**.

@@ -192,7 +192,14 @@ public sealed class PunchesScreen : ScreenBase
 /// <summary>Small modal list for choosing an employee.</summary>
 public sealed class EmployeePickerDialog : Form
 {
-    private readonly ListBox _list = new() { Dock = DockStyle.Fill, Font = Theme.Body, BorderStyle = BorderStyle.None };
+    private readonly ListBox _list = new()
+    {
+        Dock = DockStyle.Fill,
+        Font = Theme.Body,
+        BorderStyle = BorderStyle.None,
+        BackColor = Theme.Surface,
+        ForeColor = Theme.Text,
+    };
     public Employee? Selected => _list.SelectedItem as Employee;
 
     public EmployeePickerDialog(AppServices services, IEnumerable<Employee> employees)

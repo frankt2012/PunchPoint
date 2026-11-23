@@ -10,6 +10,7 @@ public sealed class SettingsScreen : ScreenBase
     private readonly TextBox _message = Theme.Input(520);
     private readonly Label _passwordStatus = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
     private readonly ComboBox _clockMode = Theme.Dropdown(470);
+    private readonly ComboBox _appearance = Theme.Dropdown(200);
 
     private readonly ComboBox _periodType = Theme.Dropdown(200);
     private readonly DateTimePicker _anchor = new() { Format = DateTimePickerFormat.Short, Width = 140, Font = Theme.Body };
@@ -100,6 +101,20 @@ public sealed class SettingsScreen : ScreenBase
         });
         clockRow.Controls.Add(_clockMode);
         stack.Add(clockRow);
+
+        var appearanceRow = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 10, 0, 0) };
+        appearanceRow.Controls.Add(new Label
+        {
+            Text = "Appearance",
+            Width = 300,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0, 8, 8, 0),
+            ForeColor = Theme.TextMuted,
+        });
+        _appearance.Items.AddRange(new object[] { "Follow Windows", "Light", "Dark" });
+        appearanceRow.Controls.Add(_appearance);
+        stack.Add(appearanceRow);
 
         stack.Add(new Label
         {
@@ -319,6 +334,7 @@ public sealed class SettingsScreen : ScreenBase
         _company.Text = s.CompanyName;
         _message.Text = s.CompanyMessage;
         _clockMode.SelectedIndex = s.ClockFullScreen ? 1 : 0;
+        _appearance.SelectedIndex = (int)s.Theme;
         _passwordStatus.Text = string.IsNullOrWhiteSpace(s.AdminPasswordHash)
             ? "  not set — the admin app is currently unprotected"
             : "  password is set";
@@ -453,6 +469,7 @@ public sealed class SettingsScreen : ScreenBase
     private void SaveSettings()
     {
         var s = Services.Store.GetSettings();
+        var previousTheme = s.Theme;
 
         s.CompanyName = _company.Text.Trim();
         s.CompanyMessage = _message.Text.Trim();
@@ -474,6 +491,7 @@ public sealed class SettingsScreen : ScreenBase
         s.TotalsFormat = _totalsFormat.SelectedIndex == 1 ? TotalsFormat.Minutes : TotalsFormat.Hundredths;
         s.EnableSeventhDayOvertime = _seventhDay.Checked;
         s.ClockFullScreen = _clockMode.SelectedIndex == 1;
+        s.Theme = (AppTheme)Math.Clamp(_appearance.SelectedIndex, 0, 2);
         s.ShowPunchCommentDialog = _punchComment.Checked;
         s.RequireApprovalBeforeExport = _requireApproval.Checked;
 
@@ -482,7 +500,18 @@ public sealed class SettingsScreen : ScreenBase
         Services.Store.Audit("Settings saved", s.CompanyName);
         Services.NotifyDataChanged();
 
-        PromptDialog.Info(this, "Settings saved.");
+        if (s.Theme != previousTheme)
+        {
+            if (PromptDialog.Confirm(this, "Appearance changed. Restart PunchPoint now to apply it?"))
+            {
+                Application.Restart();
+                Environment.Exit(0);
+            }
+        }
+        else
+        {
+            PromptDialog.Info(this, "Settings saved.");
+        }
     }
 
     private void GeneratePeriods()

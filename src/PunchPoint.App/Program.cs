@@ -53,6 +53,16 @@ internal static class Program
 
             var settings = store.GetSettings();
 
+            // --theme light|dark|system overrides the saved appearance (diagnostics/screenshots).
+            string? themeOverride = ValueOf(args, "--theme");
+            Theme.Use(themeOverride?.ToLowerInvariant() switch
+            {
+                "dark" => AppTheme.Dark,
+                "light" => AppTheme.Light,
+                "system" => AppTheme.System,
+                _ => settings.Theme,
+            });
+
             // The management app is password protected. On a fresh installation the
             // supervisor is asked to create the password before anything is shown.
             if (tourFolder is null)

@@ -83,3 +83,29 @@ public class ReportTests
         }
     }
 }
+
+public class PayPeriodLabelTests
+{
+    private static PayPeriod P(int id, DateTime start, int days) => new()
+    {
+        Id = id,
+        Start = start,
+        End = start.AddDays(days - 1),
+    };
+
+    [Fact]
+    public void Marks_current_previous_and_next()
+    {
+        var a = P(1, new DateTime(2026, 11, 4), 7);
+        var b = P(2, new DateTime(2026, 11, 11), 7);
+        var c = P(3, new DateTime(2026, 11, 18), 7);
+        var d = P(4, new DateTime(2026, 11, 25), 7);
+        var all = new[] { a, b, c, d };
+
+        Assert.StartsWith("Previous · ", PayPeriodLabels.Label(b, all, new DateTime(2026, 11, 20)));
+        Assert.StartsWith("Current · ", PayPeriodLabels.Label(c, all, new DateTime(2026, 11, 20)));
+        Assert.StartsWith("Next · ", PayPeriodLabels.Label(d, all, new DateTime(2026, 11, 20)));
+        Assert.DoesNotContain("·", PayPeriodLabels.Label(a, all, new DateTime(2026, 11, 20)));
+        Assert.Contains("Nov 11 – Nov 17, 2026", PayPeriodLabels.Label(b, all, new DateTime(2026, 11, 20)));
+    }
+}

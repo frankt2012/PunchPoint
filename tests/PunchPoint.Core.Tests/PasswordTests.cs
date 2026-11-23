@@ -101,3 +101,32 @@ public class ClockSettingsTests
         }
     }
 }
+
+public class ThemeSettingTests
+{
+    [Fact]
+    public void Theme_round_trips_and_defaults_to_system()
+    {
+        string dbPath = TestPaths.NewDatabasePath();
+        try
+        {
+            using var database = Database.Open(dbPath);
+            var store = new Store(database);
+
+            Assert.Equal(Core.Models.AppTheme.System, store.GetSettings().Theme);
+
+            var settings = store.GetSettings();
+            settings.Theme = Core.Models.AppTheme.Dark;
+            store.SaveSettings(settings);
+
+            Assert.Equal(Core.Models.AppTheme.Dark, store.GetSettings().Theme);
+        }
+        finally
+        {
+            foreach (string suffix in new[] { "", "-wal", "-shm" })
+            {
+                try { File.Delete(dbPath + suffix); } catch { }
+            }
+        }
+    }
+}

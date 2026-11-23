@@ -232,6 +232,8 @@ public sealed class KioskForm : Form
         _pin.MaxLength = 12;
         _pin.Height = 54;
         _pin.BorderStyle = BorderStyle.FixedSingle;
+        _pin.BackColor = Theme.InputBackground;
+        _pin.ForeColor = Theme.Text;
         _pin.Dock = DockStyle.Top;
         _pin.TextChanged += (_, _) =>
         {
@@ -275,7 +277,7 @@ public sealed class KioskForm : Form
                 Margin = new Padding(5),
                 Font = key.Length > 1 ? Theme.Body : new Font(Theme.Family, 22f, FontStyle.Bold),
                 FlatStyle = FlatStyle.Flat,
-                BackColor = key is "Clear" or "⌫" ? Theme.SurfaceAlt : Color.White,
+                BackColor = Theme.InputBackground,
                 ForeColor = Theme.Text,
                 Cursor = Cursors.Hand,
             };

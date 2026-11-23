@@ -6,32 +6,128 @@ namespace PunchPoint.App.UI;
 /// <summary>Shared visual language: colours, fonts and small layout helpers.</summary>
 public static class Theme
 {
-    // Palette
-    public static readonly Color Canvas = Color.FromArgb(0xF4, 0xF6, 0xF9);
-    public static readonly Color Surface = Color.White;
-    public static readonly Color SurfaceAlt = Color.FromArgb(0xF8, 0xFA, 0xFC);
-    public static readonly Color Border = Color.FromArgb(0xE2, 0xE8, 0xF0);
-    public static readonly Color BorderStrong = Color.FromArgb(0xCB, 0xD5, 0xE1);
+    /// <summary>True when the dark palette is active.</summary>
+    public static bool IsDark { get; private set; }
 
-    public static readonly Color NavBackground = Color.FromArgb(0x0F, 0x17, 0x2A);
-    public static readonly Color NavHover = Color.FromArgb(0x1E, 0x29, 0x3B);
-    public static readonly Color NavActive = Color.FromArgb(0x25, 0x63, 0xEB);
-    public static readonly Color NavText = Color.FromArgb(0xCB, 0xD5, 0xE1);
-    public static readonly Color NavTextActive = Color.White;
+    // Palette (set by Apply)
+    public static Color Canvas { get; private set; }
+    public static Color Surface { get; private set; }
+    public static Color SurfaceAlt { get; private set; }
+    public static Color Border { get; private set; }
+    public static Color BorderStrong { get; private set; }
 
-    public static readonly Color Primary = Color.FromArgb(0x25, 0x63, 0xEB);
-    public static readonly Color PrimaryHover = Color.FromArgb(0x1D, 0x4E, 0xD8);
-    public static readonly Color PrimarySoft = Color.FromArgb(0xDB, 0xEA, 0xFE);
-    public static readonly Color Success = Color.FromArgb(0x16, 0xA3, 0x4A);
-    public static readonly Color SuccessSoft = Color.FromArgb(0xDC, 0xFC, 0xE7);
-    public static readonly Color Warning = Color.FromArgb(0xD9, 0x77, 0x06);
-    public static readonly Color WarningSoft = Color.FromArgb(0xFE, 0xF3, 0xC7);
-    public static readonly Color Danger = Color.FromArgb(0xDC, 0x26, 0x26);
-    public static readonly Color DangerSoft = Color.FromArgb(0xFE, 0xE2, 0xE2);
+    public static Color NavBackground { get; private set; }
+    public static Color NavHover { get; private set; }
+    public static Color NavActive { get; private set; }
+    public static Color NavText { get; private set; }
+    public static Color NavTextActive { get; private set; }
 
-    public static readonly Color Text = Color.FromArgb(0x0F, 0x17, 0x2A);
-    public static readonly Color TextMuted = Color.FromArgb(0x64, 0x74, 0x8B);
-    public static readonly Color TextFaint = Color.FromArgb(0x94, 0xA3, 0xB8);
+    public static Color Primary { get; private set; }
+    public static Color PrimaryHover { get; private set; }
+    public static Color PrimarySoft { get; private set; }
+    public static Color Success { get; private set; }
+    public static Color SuccessSoft { get; private set; }
+    public static Color Warning { get; private set; }
+    public static Color WarningSoft { get; private set; }
+    public static Color Danger { get; private set; }
+    public static Color DangerSoft { get; private set; }
+
+    public static Color Text { get; private set; }
+    public static Color TextMuted { get; private set; }
+    public static Color TextFaint { get; private set; }
+
+    /// <summary>Background for text boxes, combo boxes and keypad keys.</summary>
+    public static Color InputBackground => IsDark ? Color.FromArgb(0x0E, 0x16, 0x24) : Color.White;
+
+    static Theme()
+    {
+        Apply(dark: false);
+    }
+
+    /// <summary>Applies the configured theme; "System" follows the Windows app mode.</summary>
+    public static void Use(Core.Models.AppTheme theme)
+    {
+        bool dark = theme == Core.Models.AppTheme.Dark ||
+                    (theme == Core.Models.AppTheme.System && WindowsPrefersDark());
+        Apply(dark);
+    }
+
+    public static void Apply(bool dark)
+    {
+        IsDark = dark;
+
+        if (dark)
+        {
+            Canvas = Color.FromArgb(0x0B, 0x12, 0x20);
+            Surface = Color.FromArgb(0x12, 0x1A, 0x29);
+            SurfaceAlt = Color.FromArgb(0x0E, 0x16, 0x24);
+            Border = Color.FromArgb(0x1F, 0x2A, 0x3C);
+            BorderStrong = Color.FromArgb(0x2B, 0x3A, 0x52);
+
+            NavBackground = Color.FromArgb(0x07, 0x0B, 0x13);
+            NavHover = Color.FromArgb(0x11, 0x1A, 0x29);
+            NavActive = Color.FromArgb(0x25, 0x63, 0xEB);
+            NavText = Color.FromArgb(0xA9, 0xB8, 0xCC);
+            NavTextActive = Color.White;
+
+            Primary = Color.FromArgb(0x3B, 0x82, 0xF6);
+            PrimaryHover = Color.FromArgb(0x25, 0x63, 0xEB);
+            PrimarySoft = Color.FromArgb(0x1E, 0x3A, 0x5F);
+            Success = Color.FromArgb(0x22, 0xC5, 0x5E);
+            SuccessSoft = Color.FromArgb(0x12, 0x35, 0x1F);
+            Warning = Color.FromArgb(0xF5, 0x9E, 0x0B);
+            WarningSoft = Color.FromArgb(0x3B, 0x2A, 0x0B);
+            Danger = Color.FromArgb(0xEF, 0x44, 0x44);
+            DangerSoft = Color.FromArgb(0x3A, 0x14, 0x14);
+
+            Text = Color.FromArgb(0xE6, 0xED, 0xF7);
+            TextMuted = Color.FromArgb(0x93, 0xA4, 0xBD);
+            TextFaint = Color.FromArgb(0x6B, 0x7C, 0x96);
+        }
+        else
+        {
+            Canvas = Color.FromArgb(0xF4, 0xF6, 0xF9);
+            Surface = Color.White;
+            SurfaceAlt = Color.FromArgb(0xF8, 0xFA, 0xFC);
+            Border = Color.FromArgb(0xE2, 0xE8, 0xF0);
+            BorderStrong = Color.FromArgb(0xCB, 0xD5, 0xE1);
+
+            NavBackground = Color.FromArgb(0x0F, 0x17, 0x2A);
+            NavHover = Color.FromArgb(0x1E, 0x29, 0x3B);
+            NavActive = Color.FromArgb(0x25, 0x63, 0xEB);
+            NavText = Color.FromArgb(0xCB, 0xD5, 0xE1);
+            NavTextActive = Color.White;
+
+            Primary = Color.FromArgb(0x25, 0x63, 0xEB);
+            PrimaryHover = Color.FromArgb(0x1D, 0x4E, 0xD8);
+            PrimarySoft = Color.FromArgb(0xDB, 0xEA, 0xFE);
+            Success = Color.FromArgb(0x16, 0xA3, 0x4A);
+            SuccessSoft = Color.FromArgb(0xDC, 0xFC, 0xE7);
+            Warning = Color.FromArgb(0xD9, 0x77, 0x06);
+            WarningSoft = Color.FromArgb(0xFE, 0xF3, 0xC7);
+            Danger = Color.FromArgb(0xDC, 0x26, 0x26);
+            DangerSoft = Color.FromArgb(0xFE, 0xE2, 0xE2);
+
+            Text = Color.FromArgb(0x0F, 0x17, 0x2A);
+            TextMuted = Color.FromArgb(0x64, 0x74, 0x8B);
+            TextFaint = Color.FromArgb(0x94, 0xA3, 0xB8);
+        }
+    }
+
+    private static bool WindowsPrefersDark()
+    {
+        if (!OperatingSystem.IsWindows()) return false;
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(
+                @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize");
+            return key?.GetValue("AppsUseLightTheme") is int value && value == 0;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     // Fonts
     public static readonly string Family = ResolveFamily();
@@ -142,6 +238,8 @@ public static class Theme
         Width = width,
         Font = Body,
         BorderStyle = BorderStyle.FixedSingle,
+        BackColor = InputBackground,
+        ForeColor = Text,
         Margin = new Padding(0, 4, 0, 8),
     };
 
@@ -150,6 +248,9 @@ public static class Theme
         Width = width,
         Font = Body,
         DropDownStyle = ComboBoxStyle.DropDownList,
+        BackColor = InputBackground,
+        ForeColor = Text,
+        FlatStyle = IsDark ? FlatStyle.Flat : FlatStyle.Standard,
         Margin = new Padding(0, 4, 0, 8),
     };
 

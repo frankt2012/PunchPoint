@@ -4,7 +4,7 @@ namespace PunchPoint.Core.Storage;
 
 public static class Schema
 {
-    public const int CurrentVersion = 4;
+    public const int CurrentVersion = 5;
 
     public static void Ensure(Database db)
     {
@@ -57,6 +57,13 @@ public static class Schema
             }
             SetVersion(db, 4);
         }
+
+        if (version < 5)
+        {
+            try { db.Execute("ALTER TABLE settings ADD COLUMN app_theme INTEGER NOT NULL DEFAULT 0;"); }
+            catch { /* already present */ }
+            SetVersion(db, 5);
+        }
     }
 
     private static int GetVersion(Database db)
@@ -91,6 +98,7 @@ public static class Schema
                 clock_fullscreen    INTEGER NOT NULL DEFAULT 0,
                 clock_width         INTEGER NOT NULL DEFAULT 1000,
                 clock_height        INTEGER NOT NULL DEFAULT 720,
+                app_theme           INTEGER NOT NULL DEFAULT 0,
                 period_type         INTEGER NOT NULL DEFAULT 0,
                 period_anchor       TEXT NOT NULL,
                 semi_monthly_split  INTEGER NOT NULL DEFAULT 16,

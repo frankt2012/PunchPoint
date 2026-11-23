@@ -153,7 +153,7 @@ public sealed class TimeCardsScreen : ScreenBase
 
             _period.Items.Clear();
             foreach (var period in _periods)
-                _period.Items.Add($"{period.Start:MMM d} – {period.End:MMM d, yyyy}");
+                _period.Items.Add(PayPeriodLabels.Label(period, _periods));
 
             var current = Services.Store.GetCurrentPayPeriod();
             int periodIndex = current is null ? 0 : Math.Max(0, _periods.FindIndex(p => p.Id == current.Id));

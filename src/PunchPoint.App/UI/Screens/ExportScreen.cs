@@ -111,7 +111,7 @@ public sealed class ExportScreen : ScreenBase
 
         _periods.Items.Clear();
         foreach (var period in _periodsLoaded)
-            _periods.Items.Add($"{period.Start:MMM d} – {period.End:MMM d, yyyy}");
+            _periods.Items.Add(PayPeriodLabels.Label(period, _periodsLoaded));
 
         if (_periodsLoaded.Count > 0) _periods.SelectedIndex = index;
         RefreshSummary();

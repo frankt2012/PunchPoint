@@ -83,6 +83,8 @@ public static class PromptDialog
             Font = new Font(Theme.Family, 12f),
             UseSystemPasswordChar = password,
             BorderStyle = BorderStyle.FixedSingle,
+            BackColor = Theme.InputBackground,
+            ForeColor = Theme.Text,
         };
 
         var buttons = new FlowLayoutPanel

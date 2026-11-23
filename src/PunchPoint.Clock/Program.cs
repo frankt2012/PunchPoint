@@ -49,7 +49,9 @@ internal static class Program
                     ? false
                     : null;
 
-            bool fullScreen = forced ?? store.GetSettings().ClockFullScreen;
+            var settings = store.GetSettings();
+            Theme.Use(settings.Theme);
+            bool fullScreen = forced ?? settings.ClockFullScreen;
 
             store.Audit("Clock started", fullScreen ? "kiosk mode" : "windowed mode");
             Application.Run(new KioskForm(store, fullScreen));

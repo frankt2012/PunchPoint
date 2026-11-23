@@ -2,6 +2,14 @@ using PunchPoint.Core.Models;
 
 namespace PunchPoint.Core.Models;
 
+public enum AppTheme
+{
+    /// <summary>Follow the Windows light/dark setting.</summary>
+    System = 0,
+    Light = 1,
+    Dark = 2,
+}
+
 public enum TotalsFormat
 {
     Minutes = 0,
@@ -64,6 +72,9 @@ public sealed class AppSettings
     /// sit alongside other programs (shared PC).
     /// </summary>
     public bool ClockFullScreen { get; set; }
+
+    /// <summary>Light, dark, or follow Windows.</summary>
+    public AppTheme Theme { get; set; } = AppTheme.System;
 
     /// <summary>Window size used when the clock is not full screen.</summary>
     public int ClockWidth { get; set; } = 1000;
