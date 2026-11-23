@@ -59,6 +59,7 @@ public sealed class ExportScreen : ScreenBase
             "Daily detail (CSV)",
             "Raw punches (CSV)",
             "QuickBooks-friendly summary (CSV)",
+            "Payroll summary (PDF)",
         });
         _format.SelectedIndex = 0;
         _format.SelectedIndexChanged += (_, _) => RefreshSummary();
@@ -188,6 +189,15 @@ public sealed class ExportScreen : ScreenBase
 
         string format = _format.SelectedItem?.ToString() ?? "Payroll summary (CSV)";
         if (format.Contains("ASCII")) dialog.FileName = baseName + ".txt";
+        if (format.Contains("PDF"))
+        {
+            dialog.Filter = "PDF file (*.pdf)|*.pdf";
+            dialog.FileName = baseName + ".pdf";
+        }
+
+        string rowFormatter(int minutes) => _decimal.Checked
+            ? (minutes / 60.0).ToString("0.00")
+            : $"{minutes / 60}:{minutes % 60:00}";
 
         if (dialog.ShowDialog(this) != DialogResult.OK) return;
 
@@ -207,6 +217,16 @@ public sealed class ExportScreen : ScreenBase
                 case "QuickBooks-friendly summary (CSV)":
                     WriteQuickBooks(rows, dialog.FileName, options);
                     break;
+                case "Payroll summary (PDF)":
+                {
+                    var table = PdfReports.FromPayrollRows(rows, new PdfReports.PayPeriodLabelContext
+                    {
+                        Subtitle = $"{period.Start:MMM d} – {period.End:MMM d, yyyy}",
+                        Hours = m => rowFormatter(m),
+                    });
+                    PdfReports.Write(table, dialog.FileName, Services.Settings.CompanyName);
+                    break;
+                }
                 default:
                     CsvExporter.WritePayrollSummary(rows, dialog.FileName, options);
                     break;

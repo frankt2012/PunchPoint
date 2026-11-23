@@ -4,7 +4,7 @@ namespace PunchPoint.Core.Storage;
 
 public static class Schema
 {
-    public const int CurrentVersion = 6;
+    public const int CurrentVersion = 7;
 
     public static void Ensure(Database db)
     {
@@ -73,6 +73,39 @@ public static class Schema
             catch { /* nothing to migrate */ }
             SetVersion(db, 6);
         }
+
+        if (version < 7)
+        {
+            foreach (var sql in new[]
+                     {
+                         "ALTER TABLE employees ADD COLUMN email TEXT NOT NULL DEFAULT '';",
+                         "ALTER TABLE settings ADD COLUMN smtp_host TEXT NOT NULL DEFAULT '';",
+                         "ALTER TABLE settings ADD COLUMN smtp_port INTEGER NOT NULL DEFAULT 587;",
+                         "ALTER TABLE settings ADD COLUMN smtp_ssl INTEGER NOT NULL DEFAULT 1;",
+                         "ALTER TABLE settings ADD COLUMN smtp_user TEXT NOT NULL DEFAULT '';",
+                         "ALTER TABLE settings ADD COLUMN smtp_password TEXT NOT NULL DEFAULT '';",
+                         "ALTER TABLE settings ADD COLUMN smtp_from TEXT NOT NULL DEFAULT '';",
+                         "ALTER TABLE settings ADD COLUMN report_email TEXT NOT NULL DEFAULT '';",
+                         "ALTER TABLE settings ADD COLUMN email_period INTEGER NOT NULL DEFAULT 0;",
+                         "ALTER TABLE settings ADD COLUMN email_employees INTEGER NOT NULL DEFAULT 0;",
+                     })
+            {
+                try { db.Execute(sql); } catch { /* already present */ }
+            }
+
+            db.Execute("""
+                CREATE TABLE IF NOT EXISTS email_log (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    period_id   INTEGER NOT NULL,
+                    kind        TEXT NOT NULL DEFAULT '',
+                    sent_at     TEXT NOT NULL,
+                    recipients  TEXT NOT NULL DEFAULT '',
+                    note        TEXT NOT NULL DEFAULT ''
+                );
+                """);
+
+            SetVersion(db, 7);
+        }
     }
 
     private static int GetVersion(Database db)
@@ -140,6 +173,7 @@ public static class Schema
                 message         TEXT NOT NULL DEFAULT '',
                 hire_date       TEXT NULL,
                 export_id       TEXT NOT NULL DEFAULT '',
+                email           TEXT NOT NULL DEFAULT '',
                 status          INTEGER NOT NULL DEFAULT 0,
                 pay_type        INTEGER NOT NULL DEFAULT 0,
                 pay_rate        TEXT NULL,

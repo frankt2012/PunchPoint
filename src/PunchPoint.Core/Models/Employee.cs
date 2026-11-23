@@ -25,6 +25,7 @@ public sealed class Employee
     public string Message { get; set; } = "";
     public DateTime? HireDate { get; set; }
     public string ExportId { get; set; } = "";
+    public string Email { get; set; } = "";
     public EmployeeStatus Status { get; set; } = EmployeeStatus.Active;
     public PayType PayType { get; set; } = PayType.Hourly;
     public decimal? PayRate { get; set; }

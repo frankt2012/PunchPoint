@@ -95,6 +95,21 @@ internal static class Program
                 form.Shown += (_, _) => new ScreenTour(form, tourFolder, database.Path, services).Start();
             }
 
+            // If a pay period has just ended and email is enabled, send its summary.
+            string dbPathForMail = database.Path;
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    using var mailDb = Database.Open(dbPathForMail);
+                    Core.Email.PeriodMailer.RunIfDue(new Store(mailDb));
+                }
+                catch
+                {
+                    // email must never stop the app from starting
+                }
+            });
+
             Application.Run(form);
             database.Dispose();
         }

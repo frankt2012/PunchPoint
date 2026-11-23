@@ -124,6 +124,33 @@ Settings → **Shifts**. A shift holds the rules for a group of employees:
 Settings → **Paid holidays**. Add the date; employees on shifts with holiday pay receive the
 configured hours for that day, and the day is marked green on the time card.
 
+## PDF reports
+
+Reports → choose any report → **PDF**. The time card, hours summary, approvals and payroll
+summary all print to a proper PDF with page numbers, using the same hours format as the screen.
+
+## Emailing the summary at the end of a pay period
+
+Settings → **Email reports**:
+
+* **SMTP server / port** — e.g. `smtp.gmail.com`, port `587` with SSL/TLS on.
+* **Username** and **password** — for Gmail/Outlook use an **app password**, not your normal
+  password (Google: Account → Security → 2-Step Verification → App passwords).
+* **Send from** — the address the mail comes from (usually the same account).
+* **Send summaries to** — where the payroll summary should arrive.
+* Tick **Email a summary automatically when a pay period ends**.
+* Optionally tick **Also email each employee their own time card** — this needs an email
+  address on each employee (Employees → Edit → Email).
+
+Press **Send test email** to prove the settings, then Save.
+
+Once a period has ended, the next time the clock (or the admin app) is running, PunchPoint
+emails one PDF with every employee's regular, overtime and holiday hours. Each period is only
+sent once — the send is recorded in the database.
+
+There is no web/remote access to the app itself: the email is the remote view. If you would
+rather have a read-only web page on your shop network, that can be added.
+
 ## Exports
 
 Reports. All files open in Excel or Google Sheets.

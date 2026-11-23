@@ -54,6 +54,24 @@ internal static class Program
             bool fullScreen = forced ?? settings.ClockFullScreen;
 
             store.Audit("Clock started", fullScreen ? "kiosk mode" : "windowed mode");
+
+            // The clock usually runs all day, so it is the natural place to send the
+            // end-of-period summary.
+            var mailTimer = new System.Windows.Forms.Timer { Interval = 30 * 60 * 1000 };
+            mailTimer.Tick += (_, _) => Task.Run(() =>
+            {
+                try
+                {
+                    using var mailDb = Database.Open(database.Path);
+                    Core.Email.PeriodMailer.RunIfDue(new Store(mailDb));
+                }
+                catch
+                {
+                    // ignore
+                }
+            });
+            mailTimer.Start();
+
             Application.Run(new KioskForm(store, fullScreen));
             store.Audit("Clock closed", Environment.UserName);
         }

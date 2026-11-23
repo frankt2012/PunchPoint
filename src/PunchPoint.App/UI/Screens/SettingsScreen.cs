@@ -1,4 +1,5 @@
 using PunchPoint.App.UI;
+using PunchPoint.Core.Email;
 using PunchPoint.Core.Models;
 using PunchPoint.Core.TimeCalc;
 
@@ -32,6 +33,16 @@ public sealed class SettingsScreen : ScreenBase
     private readonly CheckBox _roundDayTotal = Theme.Check("Round the day total instead of each punch");
     private readonly CheckBox _requireApproval = Theme.Check("Warn before exporting a period that is not fully approved");
     private readonly CheckBox _startWithWindows = Theme.Check("Start the clock automatically when Windows starts");
+    private readonly TextBox _smtpHost = Theme.Input(220);
+    private readonly NumericUpDown _smtpPort = Number(1, 65535, 0, 80);
+    private readonly CheckBox _smtpSsl = Theme.Check("Use SSL/TLS (port 465 or 587)");
+    private readonly TextBox _smtpUser = Theme.Input(240);
+    private readonly TextBox _smtpPassword = Theme.Input(240);
+    private readonly TextBox _smtpFrom = Theme.Input(260);
+    private readonly TextBox _reportEmail = Theme.Input(260);
+    private readonly CheckBox _emailPeriod = Theme.Check("Email a summary automatically when a pay period ends");
+    private readonly CheckBox _emailEmployees = Theme.Check("Also email each employee their own time card (needs an email on the employee)");
+    private readonly Label _emailStatus = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
     private readonly DataGridView _shifts = new();
     private readonly DataGridView _holidays = new();
     private readonly Label _dataLabel = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
@@ -51,6 +62,7 @@ public sealed class SettingsScreen : ScreenBase
         stack.Add(BuildRulesCard());
         stack.Add(BuildShiftCard());
         stack.Add(BuildHolidayCard());
+        stack.Add(BuildEmailCard());
         stack.Add(BuildDataCard());
 
         _periodType.Items.AddRange(new object[] { "Weekly", "Bi-weekly", "Semi-monthly", "Monthly" });
@@ -251,6 +263,81 @@ public sealed class SettingsScreen : ScreenBase
         return card;
     }
 
+    private Panel BuildEmailCard()
+    {
+        var card = Theme.Card();
+        var stack = new StackPanel(8);
+        stack.Add(SectionTitle("Email reports"));
+
+        stack.Add(new Label
+        {
+            Text = "PunchPoint can email a payroll summary PDF when a pay period ends. Use your mail " +
+                   "provider's SMTP settings; Gmail and Outlook require an app password, not your normal one.",
+            Font = Theme.Small,
+            ForeColor = Theme.TextMuted,
+            AutoSize = true,
+            MaximumSize = new Size(780, 0),
+        });
+
+        stack.Add(Row("SMTP server", _smtpHost));
+        stack.Add(Row("Port", _smtpPort));
+        stack.Add(Row("", _smtpSsl));
+        stack.Add(Row("Username", _smtpUser));
+        _smtpPassword.UseSystemPasswordChar = true;
+        stack.Add(Row("Password / app password", _smtpPassword));
+        stack.Add(Row("Send from", _smtpFrom));
+        stack.Add(Row("Send summaries to", _reportEmail));
+
+        var toggles = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Margin = new Padding(0, 6, 0, 0) };
+        toggles.Controls.Add(_emailPeriod);
+        toggles.Controls.Add(_emailEmployees);
+        stack.Add(toggles);
+
+        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false };
+        var test = Theme.SecondaryButton("Send test email", 150);
+        test.Click += (_, _) => SendTestEmail();
+        buttons.Controls.Add(test);
+        stack.Add(buttons);
+        stack.Add(_emailStatus);
+
+        card.Controls.Add(stack);
+        return card;
+    }
+
+    private void SendTestEmail()
+    {
+        try
+        {
+            var settings = CollectSettingsForEmailTest();
+            EmailService.Send(settings, new[] { settings.ReportEmail },
+                "PunchPoint test email",
+                "This is a test from PunchPoint. If you can read this, the SMTP settings work.");
+
+            _emailStatus.Text = $"Test message sent to {settings.ReportEmail}.";
+            _emailStatus.ForeColor = Theme.Success;
+        }
+        catch (Exception ex)
+        {
+            _emailStatus.Text = "Test failed: " + ex.Message;
+            _emailStatus.ForeColor = Theme.Danger;
+        }
+    }
+
+    private AppSettings CollectSettingsForEmailTest()
+    {
+        var s = Services.Store.GetSettings();
+        s.SmtpHost = _smtpHost.Text.Trim();
+        s.SmtpPort = (int)_smtpPort.Value;
+        s.SmtpUseSsl = _smtpSsl.Checked;
+        s.SmtpUser = _smtpUser.Text.Trim();
+        s.SmtpPassword = _smtpPassword.Text;
+        s.SmtpFrom = _smtpFrom.Text.Trim();
+        s.ReportEmail = _reportEmail.Text.Trim();
+        s.EmailPeriodSummary = _emailPeriod.Checked;
+        s.EmailEmployees = _emailEmployees.Checked;
+        return s;
+    }
+
     private Panel BuildDataCard()
     {
         var card = Theme.Card();
@@ -334,6 +421,15 @@ public sealed class SettingsScreen : ScreenBase
         _company.Text = s.CompanyName;
         _message.Text = s.CompanyMessage;
         _clockMode.SelectedIndex = s.ClockFullScreen ? 1 : 0;
+        _smtpHost.Text = s.SmtpHost;
+        _smtpPort.Value = Math.Clamp(s.SmtpPort, 1, 65535);
+        _smtpSsl.Checked = s.SmtpUseSsl;
+        _smtpUser.Text = s.SmtpUser;
+        _smtpPassword.Text = s.SmtpPassword;
+        _smtpFrom.Text = s.SmtpFrom;
+        _reportEmail.Text = s.ReportEmail;
+        _emailPeriod.Checked = s.EmailPeriodSummary;
+        _emailEmployees.Checked = s.EmailEmployees;
         _appearance.SelectedIndex = (int)s.Theme;
         _passwordStatus.Text = string.IsNullOrWhiteSpace(s.AdminPasswordHash)
             ? "  not set — the admin app is currently unprotected"
@@ -492,6 +588,15 @@ public sealed class SettingsScreen : ScreenBase
         s.EnableSeventhDayOvertime = _seventhDay.Checked;
         s.ClockFullScreen = _clockMode.SelectedIndex == 1;
         s.Theme = (AppTheme)Math.Clamp(_appearance.SelectedIndex, 0, 2);
+        s.SmtpHost = _smtpHost.Text.Trim();
+        s.SmtpPort = (int)_smtpPort.Value;
+        s.SmtpUseSsl = _smtpSsl.Checked;
+        s.SmtpUser = _smtpUser.Text.Trim();
+        s.SmtpPassword = _smtpPassword.Text;
+        s.SmtpFrom = _smtpFrom.Text.Trim();
+        s.ReportEmail = _reportEmail.Text.Trim();
+        s.EmailPeriodSummary = _emailPeriod.Checked;
+        s.EmailEmployees = _emailEmployees.Checked;
         s.ShowPunchCommentDialog = _punchComment.Checked;
         s.RequireApprovalBeforeExport = _requireApproval.Checked;
 

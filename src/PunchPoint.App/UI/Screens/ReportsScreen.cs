@@ -1,6 +1,8 @@
 using System.Text;
 using PunchPoint.App.UI;
 using PunchPoint.Core.Models;
+using PunchPoint.Core.Email;
+using PunchPoint.Core.Export;
 using PunchPoint.Core.Reports;
 
 namespace PunchPoint.App.UI.Screens;
@@ -50,6 +52,16 @@ public sealed class ReportsScreen : ScreenBase
         print.Margin = new Padding(0, 5, 6, 0);
         print.Click += (_, _) => PrintReport();
         Actions.Controls.Add(print);
+
+        var email = Theme.SecondaryButton("Email", 90);
+        email.Margin = new Padding(0, 5, 6, 0);
+        email.Click += (_, _) => EmailSummary();
+        Actions.Controls.Add(email);
+
+        var pdf = Theme.SecondaryButton("PDF", 80);
+        pdf.Margin = new Padding(0, 5, 6, 0);
+        pdf.Click += (_, _) => ExportPdf();
+        Actions.Controls.Add(pdf);
 
         var export = Theme.PrimaryButton("Export CSV", 120);
         export.Margin = new Padding(0, 5, 0, 0);
@@ -197,6 +209,54 @@ public sealed class ReportsScreen : ScreenBase
             Text = _table.Title,
         };
         preview.ShowDialog(this);
+    }
+
+    private void EmailSummary()
+    {
+        var period = Period;
+        if (period is null) return;
+
+        var settings = Services.Store.GetSettings();
+        if (!EmailService.IsConfigured(settings))
+        {
+            PromptDialog.Info(this,
+                "Email is not set up yet.\n\nOpen Settings → Email reports, fill in your SMTP details " +
+                "and the address that should receive the summary.");
+            return;
+        }
+
+        if (!PromptDialog.Confirm(this,
+                $"Email the payroll summary for {period.Start:MMM d} – {period.End:MMM d, yyyy} " +
+                $"to {settings.ReportEmail}?"))
+            return;
+
+        var (sent, message) = PeriodMailer.SendPeriodSummary(Services.Store, period, settings);
+        if (sent) PromptDialog.Info(this, message);
+        else PromptDialog.Warn(this, "Not sent: " + message);
+    }
+
+    private void ExportPdf()
+    {
+        if (_table is null) return;
+
+        using var dialog = new SaveFileDialog
+        {
+            Filter = "PDF file (*.pdf)|*.pdf",
+            FileName = SafeFileName(_table.Title) + ".pdf",
+            Title = "Export report as PDF",
+        };
+        if (dialog.ShowDialog(this) != DialogResult.OK) return;
+
+        try
+        {
+            PdfReports.Write(_table, dialog.FileName, Services.Settings.CompanyName);
+            Services.Store.Audit("Report exported", $"PDF {_table.Title}");
+            PromptDialog.Info(this, "Saved to\n" + dialog.FileName);
+        }
+        catch (Exception ex)
+        {
+            PromptDialog.Warn(this, "PDF export failed: " + ex.Message);
+        }
     }
 
     private void ExportReport()

@@ -14,6 +14,7 @@ public sealed class EmployeeEditDialog : EditorDialog
     private readonly TextBox _pin = Theme.Input(140);
     private readonly TextBox _badge = Theme.Input(140);
     private readonly TextBox _number = Theme.Input(140);
+    private readonly TextBox _email = Theme.Input(360);
     private readonly TextBox _message = Theme.Input(360);
     private readonly TextBox _notes = Theme.Input(360);
     private readonly TextBox _rate = Theme.Input(120);
@@ -59,6 +60,7 @@ public sealed class EmployeeEditDialog : EditorDialog
         AddRow(grid, "Pay type", _payType);
         AddRow(grid, "Pay rate", _rate);
         AddRow(grid, "Hire date", _hireDate);
+        AddRow(grid, "Email (optional)", _email);
         AddRow(grid, "Clock message", _message);
         AddRow(grid, "Notes", _notes);
         AddRow(grid, "", _active);
@@ -90,6 +92,7 @@ public sealed class EmployeeEditDialog : EditorDialog
         _pin.Text = _employee.Pin;
         _badge.Text = _employee.Badge;
         _number.Text = _employee.EmployeeNumber;
+        _email.Text = _employee.Email;
         _message.Text = _employee.Message;
         _notes.Text = _employee.Notes;
         _rate.Text = _employee.PayRate?.ToString("0.00") ?? "";
@@ -165,6 +168,7 @@ public sealed class EmployeeEditDialog : EditorDialog
         _employee.Pin = pin;
         _employee.Badge = badge;
         _employee.EmployeeNumber = _number.Text.Trim();
+        _employee.Email = _email.Text.Trim();
         _employee.Message = _message.Text.Trim();
         _employee.Notes = _notes.Text.Trim();
         _employee.PayType = _payType.SelectedIndex == 1 ? PayType.Salary : PayType.Hourly;

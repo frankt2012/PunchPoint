@@ -29,6 +29,7 @@ public static class Program
                 "timecards" => TimeCards(args[1..]),
                 "demo" => Demo(args[1..]),
                 "doctor" => Doctor(args[1..]),
+                "pdf" => Pdf(args[1..]),
                 "help" or "-h" or "--help" => Usage(),
                 _ => Unknown(args[0]),
             };
@@ -68,6 +69,9 @@ public static class Program
                 --no-settings           Do not copy company rules
                 --misc-hours            Import transactions that carry hours (vacation etc.)
                 --reset                 Delete the target database first
+
+            Reporting
+              punchpoint pdf <out.pdf> [--db <file>] [--period <n>]   Hours summary as PDF
 
             Verification
               punchpoint timecards [--db <file>] [--period <n>]   Print computed time cards
@@ -397,6 +401,39 @@ public static class Program
     }
 
     private static string Fmt(int minutes) => (minutes / 60.0).ToString("0.00");
+
+    private static int Pdf(string[] args)
+    {
+        if (args.Length < 1) return Usage();
+        string outPath = args[0];
+        string? dbPath = null;
+        int? periodId = null;
+
+        for (int i = 1; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--db": dbPath = args[++i]; break;
+                case "--period": periodId = int.Parse(args[++i]); break;
+            }
+        }
+
+        using var database = dbPath is null ? Database.OpenDefault() : Database.Open(dbPath);
+        var store = new Store(database);
+        var settings = store.GetSettings();
+        var period = periodId is int id ? store.GetPayPeriod(id) : store.GetCurrentPayPeriod();
+        if (period is null)
+        {
+            Console.Error.WriteLine("No pay period found.");
+            return 1;
+        }
+
+        var employees = store.ListEmployees(includeInactive: true);
+        var table = PunchPoint.Core.Reports.ReportBuilder.HoursSummary(store, period, settings, employees);
+        PunchPoint.Core.Export.PdfReports.Write(table, outPath, settings.CompanyName);
+        Console.WriteLine($"Wrote {outPath}");
+        return 0;
+    }
 
     private static int Doctor(string[] args)
     {

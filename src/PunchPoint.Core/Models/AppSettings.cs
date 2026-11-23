@@ -83,6 +83,20 @@ public sealed class AppSettings
     public string TimeFormat { get; set; } = "h:mm tt";
     public string DateFormat { get; set; } = "M/d/yyyy";
 
+    // ---- email ----
+    public string SmtpHost { get; set; } = "";
+    public int SmtpPort { get; set; } = 587;
+    public bool SmtpUseSsl { get; set; } = true;
+    public string SmtpUser { get; set; } = "";
+    public string SmtpPassword { get; set; } = "";
+    public string SmtpFrom { get; set; } = "";
+    /// <summary>Where the automatic period summary is sent.</summary>
+    public string ReportEmail { get; set; } = "";
+    /// <summary>Email a summary when a pay period ends.</summary>
+    public bool EmailPeriodSummary { get; set; }
+    /// <summary>Also email each employee their own time card (needs an address on the employee).</summary>
+    public bool EmailEmployees { get; set; }
+
     public string LastBackupPath { get; set; } = "";
     public int SchemaVersion { get; set; } = 1;
 }

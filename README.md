@@ -43,6 +43,10 @@ behaviour were written from scratch (see [NOTICE.md](NOTICE.md)).
 | Terminal | **Import** — reads the old timeQplus database and archives |
 | Employee Transaction | **PunchPointClock.exe** — a locked-down full-screen clock |
 
+Reports can be saved as **PDF** (built in, no external tools) and the payroll summary can be
+**emailed automatically at the end of each pay period** — useful when you want to check hours
+from home without remote access to the PC.
+
 Dark mode is built in (Settings → Appearance: *Follow Windows*, *Light* or *Dark*), and every
 pay-period drop-down marks the **Current** period, the **Previous** one and the **Next** one,
 with plain dates for everything older. Quality-of-life additions over the original: automatic daily and pre-import backups, import
@@ -63,7 +67,8 @@ self-contained executable with no runtime to install.
 | **Punches** | Every raw clock event, editable, with audit trail |
 | **Import** | Reads timeQplus `arx_active.mdb` directly; previews before writing |
 | **Reports** | Ten reports with preview, print and CSV export |
-| **Export** | Payroll, generic ASCII, daily detail, punches, QuickBooks-friendly files |
+| **Export** | Payroll, generic ASCII, daily detail, punches, QuickBooks-friendly files, PDF |
+| **Email** | Payroll summary PDF when a pay period ends, optionally a time card to each employee |
 | **Settings** | Pay periods, rounding, overtime, day-change, shifts, holidays, appearance, backups |
 
 ## Two programs

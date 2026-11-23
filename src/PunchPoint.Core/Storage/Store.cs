@@ -74,6 +74,15 @@ public sealed class Store
             ClockHeight = r.HasColumn("clock_height") ? Math.Clamp(r.GetInt("clock_height", 720), 600, 3000) : 720,
             TimeFormat = r.GetStringOrNull("time_format") ?? "h:mm tt",
             DateFormat = r.GetStringOrNull("date_format") ?? "M/d/yyyy",
+            SmtpHost = r.HasColumn("smtp_host") ? r.GetStringOrNull("smtp_host") ?? "" : "",
+            SmtpPort = r.HasColumn("smtp_port") ? r.GetInt("smtp_port", 587) : 587,
+            SmtpUseSsl = !r.HasColumn("smtp_ssl") || r.GetBool("smtp_ssl", true),
+            SmtpUser = r.HasColumn("smtp_user") ? r.GetStringOrNull("smtp_user") ?? "" : "",
+            SmtpPassword = r.HasColumn("smtp_password") ? r.GetStringOrNull("smtp_password") ?? "" : "",
+            SmtpFrom = r.HasColumn("smtp_from") ? r.GetStringOrNull("smtp_from") ?? "" : "",
+            ReportEmail = r.HasColumn("report_email") ? r.GetStringOrNull("report_email") ?? "" : "",
+            EmailPeriodSummary = r.HasColumn("email_period") && r.GetBool("email_period"),
+            EmailEmployees = r.HasColumn("email_employees") && r.GetBool("email_employees"),
             LastBackupPath = r.GetStringOrNull("last_backup_path") ?? "",
         });
 
@@ -99,6 +108,10 @@ public sealed class Store
                 clock_fullscreen = $clockFull,
                 clock_width = $clockWidth,
                 clock_height = $clockHeight,
+                smtp_host = $smtpHost, smtp_port = $smtpPort, smtp_ssl = $smtpSsl,
+                smtp_user = $smtpUser, smtp_password = $smtpPassword, smtp_from = $smtpFrom,
+                report_email = $reportEmail, email_period = $emailPeriod,
+                email_employees = $emailEmployees,
                 last_backup_path = $backup
             WHERE id = 1;
             """,
@@ -120,6 +133,10 @@ public sealed class Store
             ("$clockFull", s.ClockFullScreen ? 1 : 0),
             ("$clockWidth", s.ClockWidth),
             ("$clockHeight", s.ClockHeight),
+            ("$smtpHost", s.SmtpHost), ("$smtpPort", s.SmtpPort), ("$smtpSsl", s.SmtpUseSsl ? 1 : 0),
+            ("$smtpUser", s.SmtpUser), ("$smtpPassword", s.SmtpPassword), ("$smtpFrom", s.SmtpFrom),
+            ("$reportEmail", s.ReportEmail), ("$emailPeriod", s.EmailPeriodSummary ? 1 : 0),
+            ("$emailEmployees", s.EmailEmployees ? 1 : 0),
             ("$backup", s.LastBackupPath));
     }
 
@@ -140,6 +157,7 @@ public sealed class Store
         Message = r.GetStringOrNull("message") ?? "",
         HireDate = r.GetDateOrNull("hire_date"),
         ExportId = r.GetStringOrNull("export_id") ?? "",
+        Email = r.HasColumn("email") ? r.GetStringOrNull("email") ?? "" : "",
         Status = (EmployeeStatus)r.GetInt("status"),
         PayType = (PayType)r.GetInt("pay_type"),
         PayRate = r.GetDecimalOrNull("pay_rate"),
@@ -215,17 +233,17 @@ public sealed class Store
         _db.Execute("""
             INSERT INTO employees
                 (first_name, middle_initial, last_name, badge, pin, employee_number, shift_id, message,
-                 hire_date, export_id, status, pay_type, pay_rate, notes,
+                 hire_date, export_id, email, status, pay_type, pay_rate, notes,
                  custom1, custom2, custom3, custom4, custom5, legacy_id, created_at, updated_at)
             VALUES
                 ($first, $mi, $last, $badge, $pin, $number, $shift, $message,
-                 $hire, $export, $status, $payType, $rate, $notes,
+                 $hire, $export, $email, $status, $payType, $rate, $notes,
                  $c1, $c2, $c3, $c4, $c5, $legacy, $created, $updated);
             """,
             ("$first", e.FirstName), ("$mi", e.MiddleInitial), ("$last", e.LastName),
             ("$badge", e.Badge), ("$pin", e.Pin), ("$number", e.EmployeeNumber),
             ("$shift", e.ShiftId), ("$message", e.Message), ("$hire", DateOrNull(e.HireDate)),
-            ("$export", e.ExportId), ("$status", (int)e.Status), ("$payType", (int)e.PayType),
+            ("$export", e.ExportId), ("$email", e.Email), ("$status", (int)e.Status), ("$payType", (int)e.PayType),
             ("$rate", e.PayRate), ("$notes", e.Notes),
             ("$c1", e.Custom1), ("$c2", e.Custom2), ("$c3", e.Custom3),
             ("$c4", e.Custom4), ("$c5", e.Custom5),
@@ -241,7 +259,7 @@ public sealed class Store
             UPDATE employees SET
                 first_name = $first, middle_initial = $mi, last_name = $last,
                 badge = $badge, pin = $pin, employee_number = $number, shift_id = $shift,
-                message = $message, hire_date = $hire, export_id = $export,
+                message = $message, hire_date = $hire, export_id = $export, email = $email,
                 status = $status, pay_type = $payType, pay_rate = $rate, notes = $notes,
                 custom1 = $c1, custom2 = $c2, custom3 = $c3, custom4 = $c4, custom5 = $c5,
                 legacy_id = $legacy, updated_at = $updated
@@ -250,7 +268,7 @@ public sealed class Store
             ("$id", e.Id), ("$first", e.FirstName), ("$mi", e.MiddleInitial), ("$last", e.LastName),
             ("$badge", e.Badge), ("$pin", e.Pin), ("$number", e.EmployeeNumber),
             ("$shift", e.ShiftId), ("$message", e.Message), ("$hire", DateOrNull(e.HireDate)),
-            ("$export", e.ExportId), ("$status", (int)e.Status), ("$payType", (int)e.PayType),
+            ("$export", e.ExportId), ("$email", e.Email), ("$status", (int)e.Status), ("$payType", (int)e.PayType),
             ("$rate", e.PayRate), ("$notes", e.Notes),
             ("$c1", e.Custom1), ("$c2", e.Custom2), ("$c3", e.Custom3),
             ("$c4", e.Custom4), ("$c5", e.Custom5),
@@ -658,6 +676,21 @@ public sealed class Store
             """,
             ("$s", source), ("$t", Format(DateTime.Now)), ("$sum", summary), ("$d", details));
         return Convert.ToInt32(_db.Scalar("SELECT last_insert_rowid();"));
+    }
+
+    public bool WasPeriodEmailed(int payPeriodId, string kind = "period") =>
+        Convert.ToInt32(_db.Scalar("""
+            SELECT COUNT(*) FROM email_log WHERE period_id = $p AND kind = $k;
+            """, ("$p", payPeriodId), ("$k", kind))) > 0;
+
+    public void LogEmail(int payPeriodId, string kind, string recipients, string note = "")
+    {
+        _db.Execute("""
+            INSERT INTO email_log (period_id, kind, sent_at, recipients, note)
+            VALUES ($p, $k, $t, $r, $n);
+            """,
+            ("$p", payPeriodId), ("$k", kind), ("$t", Format(DateTime.Now)),
+            ("$r", recipients), ("$n", note));
     }
 
     public List<(DateTime When, string Source, string Summary)> ListImports(int limit = 50)
