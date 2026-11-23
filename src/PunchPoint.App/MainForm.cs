@@ -12,6 +12,12 @@ public sealed class MainForm : Form
     private string _current = "";
     private bool _adminUnlocked;
 
+    /// <summary>Screen to open first (diagnostic/technician option).</summary>
+    public string? StartScreen { get; set; }
+
+    /// <summary>Set by the diagnostic tour so it can close without the confirmation dialog.</summary>
+    public bool SuppressCloseConfirmation { get; set; }
+
     private static readonly (string Key, string Label, bool Admin)[] Nav =
     {
         ("clock", "Clock", false),
@@ -24,7 +30,7 @@ public sealed class MainForm : Form
         ("settings", "Settings", true),
     };
 
-    public MainForm(AppServices services)
+    public MainForm(AppServices services, string? startScreen = null)
     {
         _services = services;
 
@@ -56,14 +62,14 @@ public sealed class MainForm : Form
 
         _services.DataChanged += () => { if (CurrentScreen is IRefreshable r) r.RefreshData(); };
 
-        Show("clock");
+        Show(string.IsNullOrWhiteSpace(startScreen) ? "clock" : startScreen!);
     }
 
     private Control BuildNav()
     {
         var nav = new Panel { Dock = DockStyle.Fill, BackColor = Theme.NavBackground, Padding = new Padding(0) };
 
-        var brand = new Panel { Dock = DockStyle.Top, Height = 96, Padding = new Padding(22, 22, 18, 8) };
+        var brand = new Panel { Dock = DockStyle.Fill, Padding = new Padding(22, 22, 18, 8) };
         brand.Controls.Add(new Label
         {
             Text = "PunchPoint",
@@ -80,10 +86,9 @@ public sealed class MainForm : Form
             AutoSize = true,
             Location = new Point(24, 54),
         });
-        nav.Controls.Add(brand);
 
-        var bottom = new Panel { Dock = DockStyle.Bottom, Height = 74, Padding = new Padding(20, 0, 16, 12) };
-        var company = new Label
+        var bottom = new Panel { Dock = DockStyle.Fill, Padding = new Padding(20, 0, 16, 12) };
+        bottom.Controls.Add(new Label
         {
             Text = _services.Settings.CompanyName,
             ForeColor = Color.FromArgb(0x94, 0xA3, 0xB8),
@@ -92,12 +97,9 @@ public sealed class MainForm : Form
             Dock = DockStyle.Bottom,
             Height = 40,
             TextAlign = ContentAlignment.BottomLeft,
-        };
-        bottom.Controls.Add(company);
-        nav.Controls.Add(bottom);
+        });
 
         var list = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(10, 0, 10, 0) };
-        nav.Controls.Add(list);
 
         int top = 4;
         foreach (var (key, label, _) in Nav)
@@ -125,6 +127,23 @@ public sealed class MainForm : Form
             list.Controls.Add(button);
             top += 46;
         }
+
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 3,
+            Margin = new Padding(0),
+            Padding = new Padding(0),
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 74));
+        layout.Controls.Add(brand, 0, 0);
+        layout.Controls.Add(list, 0, 1);
+        layout.Controls.Add(bottom, 0, 2);
+
+        nav.Controls.Add(layout);
 
         return nav;
     }
@@ -223,7 +242,7 @@ public sealed class MainForm : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        if (e.CloseReason == CloseReason.UserClosing)
+        if (e.CloseReason == CloseReason.UserClosing && !SuppressCloseConfirmation)
         {
             var answer = MessageBox.Show(this,
                 "Close PunchPoint? Employees will not be able to clock in until it is opened again.",

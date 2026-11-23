@@ -14,7 +14,7 @@ internal static class Program
     private static Mutex? _singleInstance;
 
     [STAThread]
-    static void Main()
+    static void Main(string[] args)
     {
         // Only one copy may run against the database at a time.
         _singleInstance = new Mutex(true, @"Local\PunchPointTimeClock", out bool isFirst);
@@ -36,7 +36,13 @@ internal static class Program
         try
         {
             AppPaths.EnsureDataDirectory();
-            var database = Database.OpenDefault();
+
+            // Optional overrides, used by the diagnostic tour and by technicians.
+            string? dbOverride = ValueOf(args, "--db");
+            string? tourFolder = ValueOf(args, "--tour");
+            string? startScreen = ValueOf(args, "--screen");
+
+            var database = dbOverride is null ? Database.OpenDefault() : Database.Open(dbOverride);
             var store = new Store(database);
 
             // A daily safety copy, kept for 30 days. Cheap insurance on a work PC.
@@ -46,13 +52,36 @@ internal static class Program
             Maintenance.EnsurePeriods(store);
 
             var services = new AppServices(store);
-            Application.Run(new MainForm(services));
+            var form = new MainForm(services, startScreen);
+
+            if (tourFolder is not null)
+            {
+                // Diagnostic mode: walk every screen, save a screenshot of each, write a
+                // small report, then exit. Used to verify the UI on a real desktop.
+                Directory.CreateDirectory(tourFolder);
+                form.WindowState = FormWindowState.Maximized;
+                form.Shown += (_, _) => new ScreenTour(form, tourFolder, database.Path).Start();
+            }
+
+            Application.Run(form);
             database.Dispose();
         }
         catch (Exception ex)
         {
             ReportFatal(ex);
         }
+    }
+
+    private static string? ValueOf(string[] args, string name)
+    {
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i].StartsWith(name + "=", StringComparison.OrdinalIgnoreCase))
+                return args[i][(name.Length + 1)..];
+            if (string.Equals(args[i], name, StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+                return args[i + 1];
+        }
+        return null;
     }
 
     private static void ReportFatal(Exception? ex)

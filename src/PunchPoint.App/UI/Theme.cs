@@ -52,7 +52,6 @@ public static class Theme
         {
             using var installed = new InstalledFontCollection();
             var names = installed.Families.Select(f => f.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            if (names.Contains("Segoe UI Variable Display")) return "Segoe UI Variable Display";
             if (names.Contains("Segoe UI")) return "Segoe UI";
         }
         catch
@@ -228,6 +227,8 @@ public static class Theme
         grid.ColumnHeadersDefaultCellStyle.ForeColor = TextMuted;
         grid.ColumnHeadersDefaultCellStyle.Font = SmallBold;
         grid.ColumnHeadersDefaultCellStyle.Padding = new Padding(6, 8, 6, 8);
+        grid.ColumnHeadersDefaultCellStyle.SelectionBackColor = SurfaceAlt;
+        grid.ColumnHeadersDefaultCellStyle.SelectionForeColor = TextMuted;
         grid.ColumnHeadersHeight = 38;
         grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
         grid.DefaultCellStyle.BackColor = Surface;
