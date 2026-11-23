@@ -4,7 +4,7 @@ namespace PunchPoint.Core.Storage;
 
 public static class Schema
 {
-    public const int CurrentVersion = 8;
+    public const int CurrentVersion = 9;
 
     public static void Ensure(Database db)
     {
@@ -121,6 +121,14 @@ public static class Schema
                 try { db.Execute(sql); } catch { /* already present */ }
             }
             SetVersion(db, 8);
+        }
+
+        if (version < 9)
+        {
+            // Bind the web page to one address instead of every interface.
+            try { db.Execute("ALTER TABLE settings ADD COLUMN web_bind_ip TEXT NOT NULL DEFAULT '';"); }
+            catch { /* already present */ }
+            SetVersion(db, 9);
         }
     }
 

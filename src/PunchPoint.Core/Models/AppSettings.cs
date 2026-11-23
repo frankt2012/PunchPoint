@@ -106,6 +106,14 @@ public sealed class AppSettings
     public string WebAccessUser { get; set; } = "punchpoint";
     public string WebAccessPassword { get; set; } = "";
 
+    /// <summary>
+    /// Which network interface the read-only page listens on. Empty or "127.0.0.1" means
+    /// this PC only; a specific address means that interface only; "0.0.0.0" means every
+    /// interface (not recommended). A single address keeps VPN adapters and other networks
+    /// out entirely.
+    /// </summary>
+    public string WebBindAddress { get; set; } = "";
+
     public string LastBackupPath { get; set; } = "";
     public int SchemaVersion { get; set; } = 1;
 }

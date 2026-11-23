@@ -88,6 +88,7 @@ public sealed class Store
             WebAccessPort = r.HasColumn("web_port") ? r.GetInt("web_port", 8080) : 8080,
             WebAccessUser = r.HasColumn("web_user") ? r.GetStringOrNull("web_user") ?? "punchpoint" : "punchpoint",
             WebAccessPassword = r.HasColumn("web_password") ? r.GetStringOrNull("web_password") ?? "" : "",
+            WebBindAddress = r.HasColumn("web_bind_ip") ? r.GetStringOrNull("web_bind_ip") ?? "" : "",
             LastBackupPath = r.GetStringOrNull("last_backup_path") ?? "",
         });
 
@@ -119,7 +120,7 @@ public sealed class Store
                 email_employees = $emailEmployees,
                 encrypt_secrets = $encryptSecrets,
                 web_access = $webAccess, web_port = $webPort,
-                web_user = $webUser, web_password = $webPassword,
+                web_user = $webUser, web_password = $webPassword, web_bind_ip = $webBind,
                 last_backup_path = $backup
             WHERE id = 1;
             """,
@@ -150,6 +151,7 @@ public sealed class Store
             ("$webPort", s.WebAccessPort),
             ("$webUser", s.WebAccessUser),
             ("$webPassword", s.WebAccessPassword),
+            ("$webBind", s.WebBindAddress),
             ("$backup", s.LastBackupPath));
     }
 

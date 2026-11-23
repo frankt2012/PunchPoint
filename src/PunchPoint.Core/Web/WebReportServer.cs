@@ -21,19 +21,30 @@ public sealed class WebReportServer : IDisposable
     private readonly string _user;
     private readonly string _password;
     private readonly int _port;
+    private readonly string _bindAddress;
     private TcpListener? _listener;
     private CancellationTokenSource? _cts;
 
-    public WebReportServer(string dbPath, string user, string password, int port)
+    public WebReportServer(string dbPath, string user, string password, int port, string bindAddress = "")
     {
         _dbPath = dbPath;
         _user = string.IsNullOrWhiteSpace(user) ? "punchpoint" : user.Trim();
         _password = password;
         _port = port;
+        _bindAddress = bindAddress ?? "";
     }
 
     public string? LastError { get; private set; }
     public bool IsRunning => _listener is not null;
+
+    /// <summary>The address actually listened on (127.0.0.1 when nothing is configured).</summary>
+    public IPAddress BoundAddress { get; private set; } = IPAddress.Loopback;
+
+    /// <summary>The port actually listened on (useful when port 0 was requested).</summary>
+    public int Port { get; private set; }
+
+    public bool IsReachableFromOtherDevices => !IPAddress.IsLoopback(BoundAddress) &&
+                                               !BoundAddress.Equals(IPAddress.Any);
 
     public bool Start()
     {
@@ -43,18 +54,31 @@ public sealed class WebReportServer : IDisposable
             return false;
         }
 
+        if (!IPAddress.TryParse(string.IsNullOrWhiteSpace(_bindAddress) ? "127.0.0.1" : _bindAddress, out var address))
+        {
+            LastError = $"'{_bindAddress}' is not a valid network address.";
+            return false;
+        }
+
         try
         {
             _cts = new CancellationTokenSource();
-            _listener = new TcpListener(IPAddress.Any, _port);
+            _listener = new TcpListener(address, _port);
             _listener.Start();
+
+            BoundAddress = address;
+            Port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+
             _ = Task.Run(() => AcceptLoop(_cts.Token));
             LastError = null;
             return true;
         }
         catch (Exception ex)
         {
-            LastError = ex.Message;
+            LastError = address.Equals(IPAddress.Any)
+                ? ex.Message
+                : $"{ex.Message} ({address}) — the app may not be allowed through Windows Firewall, " +
+                  "or another program is using the port.";
             _listener = null;
             return false;
         }
@@ -114,6 +138,9 @@ public sealed class WebReportServer : IDisposable
 
                 if (!IsAuthorised(headers))
                 {
+                    // Small delay so the LAN page is not a fast password oracle.
+                    Thread.Sleep(400);
+
                     byte[] body = Encoding.UTF8.GetBytes("PunchPoint: authentication required.");
                     string head = "HTTP/1.1 401 Unauthorized\r\n" +
                                   "WWW-Authenticate: Basic realm=\"PunchPoint\"\r\n" +

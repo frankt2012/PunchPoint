@@ -43,9 +43,10 @@ behaviour were written from scratch (see [NOTICE.md](NOTICE.md)).
 | Terminal | **Import** — reads the old timeQplus database and archives |
 | Employee Transaction | **PunchPointClock.exe** — a locked-down full-screen clock |
 
-The clock can also serve a **read-only page on your local network** (`http://<pc>:8080`) so you
-can check hours from a phone or another PC without remote access to Windows. It is protected
-by a username and password and cannot change anything.
+The clock can also serve a **read-only page on one chosen network address** (`http://<pc>:8080`)
+so you can check hours from a phone or another PC without remote access to Windows. It binds
+to a single interface you pick (local-only, Wi-Fi/Ethernet, or all), so a VPN is never exposed,
+and it is protected by a username and password. It cannot change anything.
 
 Reports can be saved as **PDF** (built in, no external tools) and the payroll summary can be
 **emailed automatically at the end of each pay period** — useful when you want to check hours

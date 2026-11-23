@@ -118,7 +118,8 @@ internal static class Program
             if (settings.WebAccessEnabled)
             {
                 web = new WebReportServer(database.Path, settings.WebAccessUser,
-                    SecretProtector.Unprotect(settings.WebAccessPassword), settings.WebAccessPort);
+                    SecretProtector.Unprotect(settings.WebAccessPassword), settings.WebAccessPort,
+                    settings.WebBindAddress);
                 if (!web.Start()) web = null; // the clock is probably already serving it
             }
 
