@@ -68,12 +68,16 @@ self-contained executable with no runtime to install.
 
 | Program | Who uses it | What it can do |
 |---|---|---|
-| **PunchPointClock.exe** | Employees | A full-screen PIN clock. No menus, no employee list, no time cards. It cannot be closed without the supervisor password. |
+| **PunchPointClock.exe** | Employees | The PIN clock. Opens as a normal window so the PC can still be used for other work, or in **full-screen kiosk mode** on a PC used only for clocking in. No menus, no employee list, no time cards; closing it needs the supervisor password. |
 | **PunchPoint.exe** | Supervisors | Everything else: employees, time cards, punches, import, reports, settings. Asks for the supervisor password every time it starts. |
 
 The password is stored as a PBKDF2 hash (never in plain text), and is created the first
 time the admin app runs. The clock and the admin app share one database, so punches appear
 in the admin app immediately (it refreshes every few seconds).
+
+**Clock window mode** is a setting (Settings → Company): *Windowed* by default for a shared
+PC, or *Full screen kiosk* (always on top, locked) for a dedicated clock PC. The clock can
+also be started with `--kiosk` or `--windowed` to override it per shortcut.
 
 Keep both `.exe` files in the same folder. **Open clock** in the admin app launches the
 kiosk; *Settings → Start the clock automatically* makes the clock start with Windows.

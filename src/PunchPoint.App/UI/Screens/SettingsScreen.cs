@@ -9,6 +9,7 @@ public sealed class SettingsScreen : ScreenBase
     private readonly TextBox _company = Theme.Input(320);
     private readonly TextBox _message = Theme.Input(520);
     private readonly Label _passwordStatus = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
+    private readonly ComboBox _clockMode = Theme.Dropdown(360);
 
     private readonly ComboBox _periodType = Theme.Dropdown(200);
     private readonly DateTimePicker _anchor = new() { Format = DateTimePickerFormat.Short, Width = 140, Font = Theme.Body };
@@ -81,6 +82,37 @@ public sealed class SettingsScreen : ScreenBase
         passwordRow.Controls.Add(changePassword);
         passwordRow.Controls.Add(_passwordStatus);
         stack.Add(passwordRow);
+
+        var clockRow = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 10, 0, 0) };
+        clockRow.Controls.Add(new Label
+        {
+            Text = "Clock window",
+            Width = 300,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0, 8, 8, 0),
+            ForeColor = Theme.TextMuted,
+        });
+        _clockMode.Items.AddRange(new object[]
+        {
+            "Windowed — employees can use other programs on this PC",
+            "Full screen kiosk — locked to the clock until the password is entered",
+        });
+        clockRow.Controls.Add(_clockMode);
+        stack.Add(clockRow);
+
+        stack.Add(new Label
+        {
+            Text = "Windowed is right for a shared PC. Use kiosk mode only on a PC that is used for nothing " +
+                   "but clocking in; it covers the screen and cannot be closed without the supervisor password. " +
+                   "Restart the clock after changing this.",
+            Font = Theme.Small,
+            ForeColor = Theme.TextMuted,
+            AutoSize = true,
+            MaximumSize = new Size(760, 0),
+            Margin = new Padding(0, 2, 0, 0),
+        });
+
         card.Controls.Add(stack);
         return card;
     }
@@ -286,6 +318,7 @@ public sealed class SettingsScreen : ScreenBase
 
         _company.Text = s.CompanyName;
         _message.Text = s.CompanyMessage;
+        _clockMode.SelectedIndex = s.ClockFullScreen ? 1 : 0;
         _passwordStatus.Text = string.IsNullOrWhiteSpace(s.AdminPasswordHash)
             ? "  not set — the admin app is currently unprotected"
             : "  password is set";
@@ -440,6 +473,7 @@ public sealed class SettingsScreen : ScreenBase
         s.RoundDailyTotalInsteadOfPunches = _roundDayTotal.Checked;
         s.TotalsFormat = _totalsFormat.SelectedIndex == 1 ? TotalsFormat.Minutes : TotalsFormat.Hundredths;
         s.EnableSeventhDayOvertime = _seventhDay.Checked;
+        s.ClockFullScreen = _clockMode.SelectedIndex == 1;
         s.ShowPunchCommentDialog = _punchComment.Checked;
         s.RequireApprovalBeforeExport = _requireApproval.Checked;
 

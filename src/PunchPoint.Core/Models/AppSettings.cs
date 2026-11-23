@@ -58,6 +58,17 @@ public sealed class AppSettings
     /// <summary>All hours on a 7th consecutive worked day become overtime.</summary>
     public bool EnableSeventhDayOvertime { get; set; }
 
+    /// <summary>
+    /// True: the clock runs full screen, always on top, and cannot be closed without the
+    /// supervisor password (dedicated clock PC). False: a normal resizable window that can
+    /// sit alongside other programs (shared PC).
+    /// </summary>
+    public bool ClockFullScreen { get; set; }
+
+    /// <summary>Window size used when the clock is not full screen.</summary>
+    public int ClockWidth { get; set; } = 1000;
+    public int ClockHeight { get; set; } = 720;
+
     public string TimeFormat { get; set; } = "h:mm tt";
     public string DateFormat { get; set; } = "M/d/yyyy";
 

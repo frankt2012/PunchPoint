@@ -41,8 +41,18 @@ internal static class Program
             Maintenance.DailyBackup(database);
             Maintenance.EnsurePeriods(store);
 
-            store.Audit("Clock started", Environment.UserName);
-            Application.Run(new KioskForm(store));
+            // Windowed by default (shared PC); kiosk mode is opt-in and can be forced
+            // per shortcut with --kiosk / --windowed.
+            bool? forced = args.Any(a => string.Equals(a, "--kiosk", StringComparison.OrdinalIgnoreCase))
+                ? true
+                : args.Any(a => string.Equals(a, "--windowed", StringComparison.OrdinalIgnoreCase))
+                    ? false
+                    : null;
+
+            bool fullScreen = forced ?? store.GetSettings().ClockFullScreen;
+
+            store.Audit("Clock started", fullScreen ? "kiosk mode" : "windowed mode");
+            Application.Run(new KioskForm(store, fullScreen));
             store.Audit("Clock closed", Environment.UserName);
         }
         catch (Exception ex)

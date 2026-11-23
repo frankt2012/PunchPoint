@@ -4,7 +4,7 @@ namespace PunchPoint.Core.Storage;
 
 public static class Schema
 {
-    public const int CurrentVersion = 3;
+    public const int CurrentVersion = 4;
 
     public static void Ensure(Database db)
     {
@@ -43,6 +43,20 @@ public static class Schema
             }
             SetVersion(db, 3);
         }
+
+        if (version < 4)
+        {
+            foreach (var sql in new[]
+                     {
+                         "ALTER TABLE settings ADD COLUMN clock_fullscreen INTEGER NOT NULL DEFAULT 0;",
+                         "ALTER TABLE settings ADD COLUMN clock_width INTEGER NOT NULL DEFAULT 1000;",
+                         "ALTER TABLE settings ADD COLUMN clock_height INTEGER NOT NULL DEFAULT 720;",
+                     })
+            {
+                try { db.Execute(sql); } catch { /* already present */ }
+            }
+            SetVersion(db, 4);
+        }
     }
 
     private static int GetVersion(Database db)
@@ -74,6 +88,9 @@ public static class Schema
                 totals_format       INTEGER NOT NULL DEFAULT 1,
                 show_punch_comment  INTEGER NOT NULL DEFAULT 1,
                 enable_7th_day_ot   INTEGER NOT NULL DEFAULT 0,
+                clock_fullscreen    INTEGER NOT NULL DEFAULT 0,
+                clock_width         INTEGER NOT NULL DEFAULT 1000,
+                clock_height        INTEGER NOT NULL DEFAULT 720,
                 period_type         INTEGER NOT NULL DEFAULT 0,
                 period_anchor       TEXT NOT NULL,
                 semi_monthly_split  INTEGER NOT NULL DEFAULT 16,

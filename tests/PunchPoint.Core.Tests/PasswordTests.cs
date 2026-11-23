@@ -67,3 +67,37 @@ public class PasswordTests
         }
     }
 }
+
+public class ClockSettingsTests
+{
+    [Fact]
+    public void Clock_window_mode_round_trips()
+    {
+        string dbPath = TestPaths.NewDatabasePath();
+        try
+        {
+            using var database = Database.Open(dbPath);
+            var store = new Store(database);
+
+            var settings = store.GetSettings();
+            Assert.False(settings.ClockFullScreen); // windowed by default
+
+            settings.ClockFullScreen = true;
+            settings.ClockWidth = 1200;
+            settings.ClockHeight = 800;
+            store.SaveSettings(settings);
+
+            var reloaded = store.GetSettings();
+            Assert.True(reloaded.ClockFullScreen);
+            Assert.Equal(1200, reloaded.ClockWidth);
+            Assert.Equal(800, reloaded.ClockHeight);
+        }
+        finally
+        {
+            foreach (string suffix in new[] { "", "-wal", "-shm" })
+            {
+                try { File.Delete(dbPath + suffix); } catch { }
+            }
+        }
+    }
+}

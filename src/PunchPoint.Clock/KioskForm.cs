@@ -14,6 +14,7 @@ public sealed class KioskForm : Form
 {
     private readonly Store _store;
     private readonly ClockService _clock;
+    private readonly bool _fullScreen;
 
     private readonly Label _time = new();
     private readonly Label _date = new();
@@ -41,20 +42,39 @@ public sealed class KioskForm : Form
     private bool _hasEmployees;
     private AppSettings _settings;
 
-    public KioskForm(Store store)
+    public KioskForm(Store store, bool fullScreen)
     {
         _store = store;
         _clock = new ClockService(store);
         _settings = store.GetSettings();
+        _fullScreen = fullScreen;
 
         Text = "PunchPoint Clock";
-        FormBorderStyle = FormBorderStyle.None;
-        WindowState = FormWindowState.Maximized;
-        StartPosition = FormStartPosition.Manual;
         BackColor = Theme.Canvas;
         Font = Theme.Body;
-        TopMost = true;
         KeyPreview = true;
+
+        if (fullScreen)
+        {
+            // Dedicated clock PC: locked full screen, above everything.
+            FormBorderStyle = FormBorderStyle.None;
+            WindowState = FormWindowState.Maximized;
+            StartPosition = FormStartPosition.Manual;
+            TopMost = true;
+        }
+        else
+        {
+            // Shared PC: an ordinary window that can be minimised while other programs run.
+            FormBorderStyle = FormBorderStyle.Sizable;
+            StartPosition = FormStartPosition.CenterScreen;
+            Size = new Size(
+                Math.Clamp(_settings.ClockWidth, 820, 2400),
+                Math.Clamp(_settings.ClockHeight, 620, 1600));
+            MinimumSize = new Size(820, 620);
+            TopMost = false;
+            MaximizeBox = true;
+            MinimizeBox = true;
+        }
 
         BuildUi();
         _tick.Tick += (_, _) => OnTick();
@@ -186,31 +206,23 @@ public sealed class KioskForm : Form
             TabStop = false,
         };
         exit.FlatAppearance.BorderSize = 0;
-        exit.Location = new Point(ClientSize.Width - 116, ClientSize.Height - 42);
+        exit.Location = new Point(ClientSize.Width - 106, 8);
         exit.Click += (_, _) => SupervisorExit();
         Controls.Add(exit);
         exit.BringToFront();
-        Resize += (_, _) => exit.Location = new Point(ClientSize.Width - 116, ClientSize.Height - 42);
+        Resize += (_, _) => exit.Location = new Point(ClientSize.Width - 106, 8);
     }
 
     private void BuildPinPanel()
     {
         _pinPanel.Dock = DockStyle.Fill;
 
-        var centre = new TableLayoutPanel
+        var stack = new StackPanel(10)
         {
+            Padding = new Padding(30, 14, 30, 12),
             Dock = DockStyle.Fill,
-            ColumnCount = 3,
-            RowCount = 1,
-            Padding = new Padding(0, 8, 0, 0),
         };
-        centre.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        centre.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 520));
-        centre.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-
-        var stack = new StackPanel(10) { Padding = new Padding(10, 12, 10, 10), Dock = DockStyle.Fill };
-        centre.Controls.Add(stack, 1, 0);
-        _pinPanel.Controls.Add(centre);
+        _pinPanel.Controls.Add(stack);
 
         stack.Add(new Label { Text = "Enter your PIN", Font = Theme.H2, ForeColor = Theme.Text, AutoSize = true });
 
@@ -540,14 +552,26 @@ public sealed class KioskForm : Form
 
     protected override void OnFormClosing(FormClosingEventArgs e)
     {
-        if (!_allowClose && e.CloseReason is CloseReason.UserClosing or CloseReason.WindowsShutDown or CloseReason.TaskManagerClosing)
+        if (!_allowClose && e.CloseReason == CloseReason.UserClosing)
         {
-            // Alt+F4 and the taskbar close button must not stop the clock.
-            if (e.CloseReason == CloseReason.UserClosing)
+            // Alt+F4 and the window's close button always ask for the supervisor password.
+            e.Cancel = true;
+            SupervisorExit();
+            return;
+        }
+
+        if (_allowClose && !_fullScreen && WindowState == FormWindowState.Normal)
+        {
+            try
             {
-                e.Cancel = true;
-                SupervisorExit();
-                return;
+                var settings = _store.GetSettings();
+                settings.ClockWidth = Width;
+                settings.ClockHeight = Height;
+                _store.SaveSettings(settings);
+            }
+            catch
+            {
+                // remembering the window size is best effort
             }
         }
 

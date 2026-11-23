@@ -15,9 +15,16 @@ Import your old timeQplus data
   Import  ->  "Import the whole Data folder (all history)..."
   Choose  C:\ProgramData\Acroprint\timeQplusV3   (close the old program first)
 
-Leave the clock running for employees
-  Start "Employee Clock". To close it, press Ctrl+Shift+E or click "Supervisor"
-  in the bottom-right corner, then enter the supervisor password.
+The employee clock
+  Start "Employee Clock". It opens as a normal window, so the PC can still be used for
+  other things while it is open.
+
+  If this PC is used ONLY for clocking in, open PunchPoint -> Settings and set
+  "Clock window" to "Full screen kiosk". The clock then covers the screen, stays on top,
+  and cannot be closed without the supervisor password.
+
+  To close the clock in either mode: Ctrl+Shift+E, or the "Supervisor" button at the
+  top-right, then the supervisor password.
 
 Your data
   C:\ProgramData\PunchPoint\punchpoint.db    database

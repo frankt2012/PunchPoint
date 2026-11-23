@@ -68,6 +68,9 @@ public sealed class Store
             TotalsFormat = r.HasColumn("totals_format") ? (TotalsFormat)r.GetInt("totals_format", 1) : TotalsFormat.Hundredths,
             ShowPunchCommentDialog = !r.HasColumn("show_punch_comment") || r.GetBool("show_punch_comment", true),
             EnableSeventhDayOvertime = r.HasColumn("enable_7th_day_ot") && r.GetBool("enable_7th_day_ot"),
+            ClockFullScreen = r.HasColumn("clock_fullscreen") && r.GetBool("clock_fullscreen"),
+            ClockWidth = r.HasColumn("clock_width") ? Math.Clamp(r.GetInt("clock_width", 1000), 800, 4000) : 1000,
+            ClockHeight = r.HasColumn("clock_height") ? Math.Clamp(r.GetInt("clock_height", 720), 600, 3000) : 720,
             TimeFormat = r.GetStringOrNull("time_format") ?? "h:mm tt",
             DateFormat = r.GetStringOrNull("date_format") ?? "M/d/yyyy",
             LastBackupPath = r.GetStringOrNull("last_backup_path") ?? "",
@@ -91,6 +94,9 @@ public sealed class Store
                 time_format = $timeFormat, date_format = $dateFormat,
                 totals_format = $totalsFormat, show_punch_comment = $showComment,
                 enable_7th_day_ot = $seventhDay,
+                clock_fullscreen = $clockFull,
+                clock_width = $clockWidth,
+                clock_height = $clockHeight,
                 last_backup_path = $backup
             WHERE id = 1;
             """,
@@ -108,6 +114,9 @@ public sealed class Store
             ("$totalsFormat", (int)s.TotalsFormat),
             ("$showComment", s.ShowPunchCommentDialog ? 1 : 0),
             ("$seventhDay", s.EnableSeventhDayOvertime ? 1 : 0),
+            ("$clockFull", s.ClockFullScreen ? 1 : 0),
+            ("$clockWidth", s.ClockWidth),
+            ("$clockHeight", s.ClockHeight),
             ("$backup", s.LastBackupPath));
     }
 

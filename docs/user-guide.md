@@ -4,9 +4,11 @@
 
 PunchPoint is two programs:
 
-* **PunchPointClock.exe** — the employee clock. Full screen, PIN pad only. It cannot be
-  closed without the supervisor password (or the **Supervisor** button in the bottom-right
-  corner, which asks for it).
+* **PunchPointClock.exe** — the employee clock. PIN pad only, and by default an ordinary
+  window so the PC can be used for other work at the same time. On a PC used only for
+  clocking in, set Settings → Company → **Clock window** to *Full screen kiosk*: it then
+  covers the screen, stays on top, and cannot be closed without the password. Either way,
+  **Ctrl+Shift+E** or the **Supervisor** button (top-right) asks for the password.
 * **PunchPoint.exe** — the management app. It asks for the supervisor password every time
   it starts, and creates one on first run.
 
