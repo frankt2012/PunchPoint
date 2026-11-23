@@ -23,3 +23,8 @@ scratch/
 ## Secrets / local config
 *.local.json
 .env
+
+## Installer working folders
+build/
+installer/stage/
+src/PunchPoint.Setup/payload.zip

@@ -1,0 +1,101 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "11.0.x"
+
+      - name: Version
+        id: version
+        shell: pwsh
+        run: |
+          $v = "${{ github.ref_name }}" -replace '^v', ''
+          if ($v -notmatch '^\d+\.\d+') { $v = "1.0.0" }
+          "value=$v" >> $env:GITHUB_OUTPUT
+
+      - name: Test
+        run: dotnet test tests/PunchPoint.Core.Tests -c Release --nologo
+
+      - name: Publish x64
+        shell: pwsh
+        run: |
+          $common = @(
+            "-c", "Release", "-r", "win-x64", "--self-contained", "true",
+            "-p:PublishSingleFile=true",
+            "-p:IncludeNativeLibrariesForSelfExtract=true",
+            "-p:EnableCompressionInSingleFile=true",
+            "-p:Version=${{ steps.version.outputs.value }}")
+          dotnet publish src/PunchPoint.App   @common -o dist/win-x64
+          dotnet publish src/PunchPoint.Clock @common -o dist/win-x64
+
+      - name: Publish arm64
+        shell: pwsh
+        run: |
+          $common = @(
+            "-c", "Release", "-r", "win-arm64", "--self-contained", "true",
+            "-p:PublishSingleFile=true",
+            "-p:IncludeNativeLibrariesForSelfExtract=true",
+            "-p:EnableCompressionInSingleFile=true",
+            "-p:Version=${{ steps.version.outputs.value }}")
+          dotnet publish src/PunchPoint.App   @common -o dist/win-arm64
+          dotnet publish src/PunchPoint.Clock @common -o dist/win-arm64
+
+      - name: Build installer payload
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force build/payload | Out-Null
+          Copy-Item dist/win-x64/PunchPoint.exe, dist/win-x64/PunchPointClock.exe build/payload/
+          Copy-Item installer/README.txt build/payload/
+          Remove-Item src/PunchPoint.Setup/payload.zip -ErrorAction SilentlyContinue
+          Compress-Archive -Path build/payload/* -DestinationPath src/PunchPoint.Setup/payload.zip -Force
+
+      - name: Build installer
+        shell: pwsh
+        run: |
+          dotnet publish src/PunchPoint.Setup -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -p:Version=${{ steps.version.outputs.value }} `
+            -o build/setup
+          Copy-Item build/setup/PunchPointSetup.exe "dist/PunchPoint-Setup-${{ steps.version.outputs.value }}.exe"
+
+      - name: Portable zips
+        shell: pwsh
+        run: |
+          Compress-Archive -Path dist/win-x64/PunchPoint.exe, dist/win-x64/PunchPointClock.exe `
+            -DestinationPath "dist/PunchPoint-${{ steps.version.outputs.value }}-win-x64.zip" -Force
+          Compress-Archive -Path dist/win-arm64/PunchPoint.exe, dist/win-arm64/PunchPointClock.exe `
+            -DestinationPath "dist/PunchPoint-${{ steps.version.outputs.value }}-win-arm64.zip" -Force
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: punchpoint-windows
+          path: |
+            dist/PunchPoint-Setup-*.exe
+            dist/PunchPoint-*-win-*.zip
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/PunchPoint-Setup-*.exe
+            dist/PunchPoint-*-win-*.zip
+          generate_release_notes: true

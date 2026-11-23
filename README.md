@@ -90,7 +90,39 @@ library embedded — no emulation, no runtime install. The ARM build exists only
 ARM-based Windows machines; an ARM PC can also run the x64 build under Windows' built-in
 emulation if you prefer one file for everyone.
 
-## Install and run
+## Install (recommended)
+
+Download **`PunchPoint-Setup-x.y.z.exe`** from [Releases](../../releases) and run it.
+It is a normal Windows installer:
+
+* installs to `C:\Program Files\PunchPoint` with a UAC prompt;
+* adds **PunchPoint** and **Employee Clock** to the Start Menu (and optionally the Desktop);
+* appears in *Settings → Apps* with a working uninstaller that asks whether to keep your data;
+* about 90 MB, self-contained — no .NET runtime to install.
+
+Portable builds (`PunchPoint-x.y.z-win-x64.zip`, `…-win-arm64.zip`) are attached to the same
+release if you prefer to copy two files onto a machine.
+
+The installer is a native **64-bit** setup program, so it runs on Intel/AMD Windows and on
+Windows on ARM under x64 emulation. It installs both programs, creates Start Menu and
+optional desktop shortcuts, and registers a proper uninstaller that asks whether to keep
+your time records.
+
+## Build the installer yourself
+
+```bash
+./scripts/build-installer.sh 1.0.0
+```
+
+The script runs the tests, publishes both programs, packs them as the installer payload and
+produces `dist/PunchPoint-Setup-1.0.0.exe`. Only the .NET SDK, `zip` and the repo are needed
+— no Windows machine.
+
+Pushing a tag (`git tag v1.0.0 && git push --tags`) makes GitHub Actions test the code,
+publish for x64 and ARM64, build the installer and attach the installer plus both portable
+zips to a release automatically.
+
+## Run without installing
 
 1. Copy `PunchPoint.exe` **and** `PunchPointClock.exe` to the work PC (for example `C:\PunchPoint`).
 2. Double-click `PunchPoint.exe` and create the supervisor password when asked.

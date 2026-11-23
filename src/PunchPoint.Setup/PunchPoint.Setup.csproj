@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net11.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>PunchPoint.Setup</RootNamespace>
+    <AssemblyName>PunchPointSetup</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\PunchPoint.App\Resources\punchpoint.ico</ApplicationIcon>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <DebugType>embedded</DebugType>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PunchPoint.Ui\PunchPoint.Ui.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('payload.zip')">
+    <EmbeddedResource Include="payload.zip" LogicalName="PunchPoint.Setup.payload.zip" />
+  </ItemGroup>
+</Project>
