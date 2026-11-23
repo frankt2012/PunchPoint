@@ -1,4 +1,5 @@
 using PunchPoint.App.UI;
+using PunchPoint.App.UI.Screens;
 using System.Drawing.Imaging;
 using System.Text;
 
@@ -116,7 +117,8 @@ internal sealed class ScreenTour
                      {
                          ("dashboard", "11-windowed-dashboard"),
                          ("timecards", "12-windowed-punchediting"),
-                         ("settings", "13-windowed-settings"),
+                         ("reports", "13-windowed-reports"),
+                         ("settings", "14-windowed-settings"),
                      })
             {
                 _form.Show(key);
@@ -125,6 +127,23 @@ internal sealed class ScreenTour
                 Thread.Sleep(450);
                 Capture(Path.Combine(_folder, name + ".png"));
                 _report.AppendLine($"{name}: captured");
+            }
+
+            // The Settings page is long: capture the email and web cards too.
+            if (_form.Screen is SettingsScreen settings)
+            {
+                foreach (var (scroll, name) in new (Action, string)[]
+                         {
+                             (settings.ScrollToEmailCard, "15-windowed-settings-email"),
+                             (settings.ScrollToWebCard, "16-windowed-settings-web"),
+                         })
+                {
+                    scroll();
+                    Application.DoEvents();
+                    Thread.Sleep(450);
+                    Capture(Path.Combine(_folder, name + ".png"));
+                    _report.AppendLine($"{name}: captured");
+                }
             }
 
             using var dialog = new EmployeeEditDialog(_services, null)
@@ -138,9 +157,9 @@ internal sealed class ScreenTour
             using (var bitmap = new Bitmap(dialog.Width, dialog.Height))
             {
                 dialog.DrawToBitmap(bitmap, new Rectangle(0, 0, dialog.Width, dialog.Height));
-                bitmap.Save(Path.Combine(_folder, "14-add-employee.png"), ImageFormat.Png);
+                bitmap.Save(Path.Combine(_folder, "17-add-employee.png"), ImageFormat.Png);
             }
-            _report.AppendLine("14-add-employee: captured");
+            _report.AppendLine("17-add-employee: captured");
             dialog.Close();
         }
         catch (Exception ex)

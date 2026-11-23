@@ -126,6 +126,7 @@ public class EditorDialog : Form
     public EditorDialog(string title, string subtitle, int width = 560, int height = 620)
     {
         Text = title;
+        Theme.ApplyTitleBar(this);
         StartPosition = FormStartPosition.CenterParent;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MinimizeBox = false;

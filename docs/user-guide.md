@@ -81,6 +81,11 @@ is taken from the old data.
 Settings → Company → **Appearance**: *Follow Windows* (default), *Light* or *Dark*. Changing it
 asks you to restart PunchPoint, and the employee clock picks it up the next time it starts.
 
+In dark mode the window frame, drop-downs, lists, cards and grids all follow the palette.
+A few controls are drawn by Windows itself (the calendar on a date field and the scroll bars)
+and keep the system colours. The dashboard always shows totals in the format chosen under
+**Totals shown as** — hours and minutes (`8:30`) unless you pick hundredths (`8.50`).
+
 ## Pay periods in drop-downs
 
 Every period list marks the one containing today as **Current**, the period before it as

@@ -16,8 +16,8 @@ public sealed class ImportScreen : ScreenBase
     private readonly CheckBox _doApprovals = Theme.Check("Import approved time cards");
     private readonly CheckBox _deactivateStale = Theme.Check("Deactivate employees with no punches in the last 90 days");
     private readonly CheckBox _useDates = Theme.Check("Only import punches in this date range");
-    private readonly DateTimePicker _from = new() { Format = DateTimePickerFormat.Short, Width = 130, Font = Theme.Body };
-    private readonly DateTimePicker _to = new() { Format = DateTimePickerFormat.Short, Width = 130, Font = Theme.Body };
+    private readonly DateTimePicker _from = Theme.Date(130);
+    private readonly DateTimePicker _to = Theme.Date(130);
     private readonly ComboBox _direction = Theme.Dropdown(320);
     private readonly ProgressBar _progress = new() { Style = ProgressBarStyle.Marquee, Visible = false, Height = 6 };
     private readonly Button _importButton = Theme.PrimaryButton("Start import", 150);

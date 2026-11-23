@@ -27,7 +27,7 @@ public sealed class ReportsScreen : ScreenBase
         ("Rules Setup", "Overtime, rounding and period rules"),
     };
 
-    private readonly ListBox _list = new();
+    private readonly ListBox _list = Theme.List();
     private readonly ComboBox _periods = Theme.Dropdown(240);
     private readonly ComboBox _employeeFilter = Theme.Dropdown(220);
     private readonly DataGridView _grid = new();

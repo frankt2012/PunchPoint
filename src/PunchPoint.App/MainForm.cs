@@ -36,6 +36,7 @@ public sealed class MainForm : Form
         _services = services;
 
         Text = "PunchPoint — Time & Attendance";
+        Theme.ApplyTitleBar(this);
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(1120, 720);
         Size = new Size(1360, 880);
@@ -237,6 +238,10 @@ public sealed class MainForm : Form
 
         _screens[key].BringToFront();
     }
+
+    /// <summary>The screen currently on display (diagnostics).</summary>
+    internal UserControl? Screen =>
+        _current.Length > 0 && _screens.TryGetValue(_current, out var screen) ? screen : null;
 
     private UserControl? CurrentScreen =>
         _current.Length > 0 && _screens.TryGetValue(_current, out var screen) ? screen : null;

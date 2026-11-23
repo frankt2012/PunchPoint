@@ -46,6 +46,9 @@ public static class SecretProtector
 
         if (stored.StartsWith(DpapiPrefix, StringComparison.Ordinal))
         {
+            // A DPAPI value can only be read on Windows, by the same Windows account.
+            if (!OperatingSystem.IsWindows()) return "";
+
             try
             {
                 byte[] data = Convert.FromBase64String(stored[DpapiPrefix.Length..]);

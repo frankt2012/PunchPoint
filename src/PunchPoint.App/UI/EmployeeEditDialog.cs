@@ -21,13 +21,7 @@ public sealed class EmployeeEditDialog : EditorDialog
     private readonly ComboBox _shift = Theme.Dropdown(240);
     private readonly ComboBox _payType = Theme.Dropdown(160);
     private readonly CheckBox _active = Theme.Check("Active employee (can clock in)");
-    private readonly DateTimePicker _hireDate = new()
-    {
-        Format = DateTimePickerFormat.Short,
-        ShowCheckBox = true,
-        Width = 160,
-        Font = Theme.Body,
-    };
+    private readonly DateTimePicker _hireDate = Theme.Date(170);
 
     public EmployeeEditDialog(AppServices services, Employee? employee)
         : base(employee is null ? "Add employee" : "Edit employee",

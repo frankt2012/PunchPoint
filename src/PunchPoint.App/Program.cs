@@ -65,6 +65,8 @@ internal static class Program
                 _ => settings.Theme,
             });
 
+            Fmt.Totals = settings.TotalsFormat;
+
             // The management app is password protected. On a fresh installation the
             // supervisor is asked to create the password before anything is shown.
             if (tourFolder is null)

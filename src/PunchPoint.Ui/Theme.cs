@@ -243,16 +243,176 @@ public static class Theme
         Margin = new Padding(0, 4, 0, 8),
     };
 
-    public static ComboBox Dropdown(int width = 260) => new()
+    public static ComboBox Dropdown(int width = 260)
     {
-        Width = width,
-        Font = Body,
-        DropDownStyle = ComboBoxStyle.DropDownList,
-        BackColor = InputBackground,
+        var combo = new ComboBox
+        {
+            Width = width,
+            Font = Body,
+            DropDownStyle = ComboBoxStyle.DropDownList,
+            BackColor = InputBackground,
+            ForeColor = Text,
+            FlatStyle = IsDark ? FlatStyle.Flat : FlatStyle.Standard,
+            Margin = new Padding(0, 4, 0, 8),
+        };
+
+        if (IsDark)
+        {
+            combo.DrawMode = DrawMode.OwnerDrawFixed;
+            combo.ItemHeight = 22;
+            combo.DrawItem += PaintComboItem;
+            combo.Paint += PaintComboFace;
+        }
+        return combo;
+    }
+
+    /// <summary>Owner-draws the drop-down rows in dark mode.</summary>
+    private static void PaintComboItem(object? sender, DrawItemEventArgs e)
+    {
+        // The closed box is painted in PaintComboFace, which runs after the native paint,
+        // so the text is drawn in exactly one place.
+        if (sender is not ComboBox combo || e.Index < 0) return;
+
+        bool selected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+
+        using (var background = new SolidBrush(selected ? Primary : InputBackground))
+            e.Graphics.FillRectangle(background, e.Bounds);
+
+        string text = combo.Items[e.Index]?.ToString() ?? "";
+        var bounds = new Rectangle(e.Bounds.X + 5, e.Bounds.Y, Math.Max(0, e.Bounds.Width - 10), e.Bounds.Height);
+        TextRenderer.DrawText(e.Graphics, text, Body, bounds,
+            selected ? Color.White : Text,
+            TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+    }
+
+    /// <summary>
+    /// Paints the closed box: background, selected text, then a chevron. Windows draws the
+    /// combo's own face and arrow with the system colours and ignores BackColor, so covering
+    /// them here is what makes a drop-down look right in dark mode.
+    /// </summary>
+    private static void PaintComboFace(object? sender, PaintEventArgs e)
+    {
+        if (sender is not ComboBox combo) return;
+
+        int arrowWidth = SystemInformation.VerticalScrollBarWidth + 4;
+        var client = combo.ClientRectangle;
+
+        using (var fill = new SolidBrush(InputBackground))
+            e.Graphics.FillRectangle(fill, client);
+
+        string text = combo.Text;
+        if (text.Length > 0)
+        {
+            var bounds = new Rectangle(5, client.Top, Math.Max(0, client.Width - arrowWidth - 5), client.Height);
+            TextRenderer.DrawText(e.Graphics, text, Body, bounds,
+                combo.Enabled ? Text : TextFaint,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+        }
+
+        using (var pen = new Pen(TextMuted, 1.6f))
+        {
+            int cx = client.Right - arrowWidth / 2 - 1;
+            int cy = client.Top + client.Height / 2;
+            e.Graphics.DrawLine(pen, cx - 4, cy - 2, cx, cy + 2);
+            e.Graphics.DrawLine(pen, cx, cy + 2, cx + 4, cy - 2);
+        }
+    }
+
+    /// <summary>A list box that follows the palette (the native one is always white).</summary>
+    public static ListBox List() => new()
+    {
+        BackColor = Surface,
         ForeColor = Text,
-        FlatStyle = IsDark ? FlatStyle.Flat : FlatStyle.Standard,
-        Margin = new Padding(0, 4, 0, 8),
+        BorderStyle = BorderStyle.None,
+        Font = Body,
+        IntegralHeight = false,
     };
+
+    /// <summary>Numeric spinner with a themed text area and spin buttons where possible.</summary>
+    public static NumericUpDown Number(decimal min, decimal max, int decimals, int width, decimal increment = 1)
+    {
+        var box = new NumericUpDown
+        {
+            Minimum = min,
+            Maximum = max,
+            DecimalPlaces = decimals,
+            Increment = increment,
+            Width = width,
+            Font = Body,
+            TextAlign = HorizontalAlignment.Right,
+            BackColor = InputBackground,
+            ForeColor = Text,
+            BorderStyle = IsDark ? BorderStyle.FixedSingle : BorderStyle.Fixed3D,
+        };
+
+        if (IsDark)
+        {
+            box.HandleCreated += (_, _) => NativeTheme(Box(box));
+        }
+        return box;
+    }
+
+    private static IntPtr Box(Control control) => control.Handle;
+
+    /// <summary>Date picker with dark calendar colours (the field itself is drawn by Windows).</summary>
+    public static DateTimePicker Date(int width = 140, DateTimePickerFormat format = DateTimePickerFormat.Short,
+        bool timeOnly = false)
+    {
+        var picker = new DateTimePicker
+        {
+            Width = width,
+            Font = Body,
+            Format = format,
+            ShowUpDown = timeOnly,
+        };
+
+        if (IsDark)
+            picker.HandleCreated += (_, _) => NativeTheme(picker.Handle);
+        return picker;
+    }
+
+    // -----------------------------------------------------------------
+    // Window chrome and native spin buttons
+    // -----------------------------------------------------------------
+
+    private const int DwmwaUseImmersiveDarkMode = 20;
+    private const int DwmwaUseImmersiveDarkModeBefore20H1 = 19;
+
+    [System.Runtime.InteropServices.DllImport("dwmapi.dll", PreserveSig = true)]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
+    /// <summary>Dark title bar to match the theme. Ignored on older Windows versions.</summary>
+    public static void ApplyTitleBar(Form form)
+    {
+        if (!IsDark || !OperatingSystem.IsWindows()) return;
+
+        void Apply()
+        {
+            try
+            {
+                int on = 1;
+                if (DwmSetWindowAttribute(form.Handle, DwmwaUseImmersiveDarkMode, ref on, sizeof(int)) != 0)
+                    DwmSetWindowAttribute(form.Handle, DwmwaUseImmersiveDarkModeBefore20H1, ref on, sizeof(int));
+            }
+            catch
+            {
+                // purely cosmetic
+            }
+        }
+
+        if (form.IsHandleCreated) Apply();
+        else form.HandleCreated += (_, _) => Apply();
+    }
+
+    [System.Runtime.InteropServices.DllImport("uxtheme.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern int SetWindowTheme(IntPtr hwnd, string? subAppName, string? subIdList);
+
+    private static void NativeTheme(IntPtr handle)
+    {
+        if (!IsDark) return;
+        try { SetWindowTheme(handle, "DarkMode_Explorer", null); }
+        catch { /* not supported on this build */ }
+    }
 
     public static CheckBox Check(string text) => new()
     {
@@ -381,7 +541,10 @@ public static class Theme
 /// <summary>Helpers for consistently formatted text in the UI.</summary>
 public static class Fmt
 {
-    public static string Hours(int minutes) => (minutes / 60.0).ToString("0.00");
+    /// <summary>How totals are shown; set at startup from the saved setting.</summary>
+    public static Core.Models.TotalsFormat Totals { get; set; } = Core.Models.TotalsFormat.Minutes;
+
+    public static string Hours(int minutes) => Core.Reports.ReportBuilder.Hours(minutes, Totals);
     public static string HoursOrDash(int minutes) => minutes == 0 ? "–" : Hours(minutes);
 
     public static string Time(DateTime value) => value.ToString("h:mm tt");

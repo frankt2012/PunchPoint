@@ -14,6 +14,7 @@ public sealed class DayDetailDialog : Form
 
     public DayDetailDialog(AppServices services, Employee employee, PayPeriod period, DayTotals day)
     {
+        Theme.ApplyTitleBar(this);
         _services = services;
         _employee = employee;
         _period = period;
@@ -136,6 +137,7 @@ public sealed class DayPunchesDialog : Form
 
     public DayPunchesDialog(AppServices services, Employee employee, DateTime workDate)
     {
+        Theme.ApplyTitleBar(this);
         _services = services;
         _employee = employee;
         _workDate = workDate;

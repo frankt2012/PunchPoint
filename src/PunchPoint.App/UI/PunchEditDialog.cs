@@ -8,10 +8,10 @@ public sealed class PunchEditDialog : EditorDialog
     private readonly Employee _employee;
     private readonly Punch? _punch;
 
-    private readonly DateTimePicker _date = new() { Format = DateTimePickerFormat.Long, Width = 220, Font = Theme.Body };
-    private readonly DateTimePicker _time = new() { Format = DateTimePickerFormat.Time, ShowUpDown = true, Width = 140, Font = Theme.Body };
+    private readonly DateTimePicker _date = Theme.Date(220, DateTimePickerFormat.Long);
+    private readonly DateTimePicker _time = Theme.Date(140, DateTimePickerFormat.Time, timeOnly: true);
     private readonly ComboBox _kind = Theme.Dropdown(200);
-    private readonly NumericUpDown _hours = new() { Width = 100, DecimalPlaces = 2, Maximum = 24, Increment = 0.25m, Font = Theme.Body };
+    private readonly NumericUpDown _hours = Theme.Number(0, 24, 2, 100, 0.25m);
     private readonly ComboBox _category = Theme.Dropdown(200);
     private readonly TextBox _comment = Theme.Input(340);
     private Label? _hoursLabelRow;

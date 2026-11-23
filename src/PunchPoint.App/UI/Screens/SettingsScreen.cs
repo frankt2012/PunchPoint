@@ -15,7 +15,7 @@ public sealed class SettingsScreen : ScreenBase
     private readonly ComboBox _appearance = Theme.Dropdown(200);
 
     private readonly ComboBox _periodType = Theme.Dropdown(200);
-    private readonly DateTimePicker _anchor = new() { Format = DateTimePickerFormat.Short, Width = 140, Font = Theme.Body };
+    private readonly DateTimePicker _anchor = Theme.Date(140);
     private readonly NumericUpDown _splitDay = Number(1, 28, 0, 80);
 
     private readonly NumericUpDown _rounding = Number(0, 60, 0, 80);
@@ -50,6 +50,8 @@ public sealed class SettingsScreen : ScreenBase
     private readonly TextBox _webUser = Theme.Input(180);
     private readonly TextBox _webPassword = Theme.Input(220);
     private readonly Label _webHint = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
+    private readonly Panel _emailCard;
+    private readonly Panel _webCard;
     private readonly DataGridView _shifts = new();
     private readonly DataGridView _holidays = new();
     private readonly Label _dataLabel = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
@@ -69,8 +71,8 @@ public sealed class SettingsScreen : ScreenBase
         stack.Add(BuildRulesCard());
         stack.Add(BuildShiftCard());
         stack.Add(BuildHolidayCard());
-        stack.Add(BuildEmailCard());
-        stack.Add(BuildWebCard());
+        stack.Add(_emailCard = BuildEmailCard());
+        stack.Add(_webCard = BuildWebCard());
         stack.Add(BuildDataCard());
 
         _periodType.Items.AddRange(new object[] { "Weekly", "Bi-weekly", "Semi-monthly", "Monthly" });
@@ -79,16 +81,7 @@ public sealed class SettingsScreen : ScreenBase
     }
 
     private static NumericUpDown Number(decimal min, decimal max, int decimals, int width, decimal increment = 1)
-        => new()
-        {
-            Minimum = min,
-            Maximum = max,
-            DecimalPlaces = decimals,
-            Increment = increment,
-            Width = width,
-            Font = Theme.Body,
-            TextAlign = HorizontalAlignment.Right,
-        };
+        => Theme.Number(min, max, decimals, width, increment);
 
     private Panel BuildCompanyCard()
     {
@@ -269,6 +262,21 @@ public sealed class SettingsScreen : ScreenBase
 
         card.Controls.Add(stack);
         return card;
+    }
+
+    /// <summary>Diagnostics: bring the email card into view for a screenshot.</summary>
+    public void ScrollToEmailCard() => RevealCard(_emailCard);
+
+    /// <summary>Diagnostics: bring the web card into view for a screenshot.</summary>
+    public void ScrollToWebCard() => RevealCard(_webCard);
+
+    private void RevealCard(Panel card)
+    {
+        Body.PerformLayout();
+        var target = new Point(0, Math.Max(0, card.Top - 8));
+        Body.AutoScrollPosition = target;
+        Body.ScrollControlIntoView(card);
+        Body.PerformLayout();
     }
 
     private Panel BuildEmailCard()
@@ -672,6 +680,7 @@ public sealed class SettingsScreen : ScreenBase
         s.EnableSeventhDayOvertime = _seventhDay.Checked;
         s.ClockFullScreen = _clockMode.SelectedIndex == 1;
         s.Theme = (AppTheme)Math.Clamp(_appearance.SelectedIndex, 0, 2);
+        Fmt.Totals = s.TotalsFormat;
         s.SmtpHost = _smtpHost.Text.Trim();
         s.SmtpPort = (int)_smtpPort.Value;
         s.SmtpUseSsl = _smtpSsl.Checked;

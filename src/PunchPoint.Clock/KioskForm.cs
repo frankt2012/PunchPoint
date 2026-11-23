@@ -49,6 +49,7 @@ public sealed class KioskForm : Form
         _clock = new ClockService(store);
         _settings = store.GetSettings();
         _fullScreen = fullScreen;
+        Theme.ApplyTitleBar(this);
 
         Text = "PunchPoint Clock";
         BackColor = Theme.Canvas;

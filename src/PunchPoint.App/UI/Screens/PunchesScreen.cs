@@ -6,8 +6,8 @@ namespace PunchPoint.App.UI.Screens;
 public sealed class PunchesScreen : ScreenBase
 {
     private readonly DataGridView _grid = new();
-    private readonly DateTimePicker _from = new() { Format = DateTimePickerFormat.Short, Width = 130, Font = Theme.Body };
-    private readonly DateTimePicker _to = new() { Format = DateTimePickerFormat.Short, Width = 130, Font = Theme.Body };
+    private readonly DateTimePicker _from = Theme.Date(130);
+    private readonly DateTimePicker _to = Theme.Date(130);
     private readonly ComboBox _employeeFilter = Theme.Dropdown(220);
     private List<Employee> _employees = new();
     private bool _loading;
@@ -204,6 +204,7 @@ public sealed class EmployeePickerDialog : Form
 
     public EmployeePickerDialog(AppServices services, IEnumerable<Employee> employees)
     {
+        Theme.ApplyTitleBar(this);
         Text = "Choose an employee";
         StartPosition = FormStartPosition.CenterParent;
         ClientSize = new Size(420, 520);

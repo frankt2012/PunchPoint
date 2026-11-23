@@ -54,6 +54,8 @@ public static class AdminPassword
 
     private sealed class PasswordForm : Form
     {
+        // dark title bar when the app runs in dark mode
+
         private readonly TextBox _password = Theme.Input(320);
         private readonly TextBox _confirm = Theme.Input(320);
         private readonly Label _error = new() { AutoSize = true, ForeColor = Theme.Danger, Font = Theme.SmallBold };
@@ -63,6 +65,7 @@ public static class AdminPassword
         public PasswordForm(string title, string prompt, bool showConfirm)
         {
             Text = title;
+            Theme.ApplyTitleBar(this);
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MinimizeBox = false;

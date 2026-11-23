@@ -53,6 +53,7 @@ internal static class Program
 
             var settings = store.GetSettings();
             Theme.Use(settings.Theme);
+            Fmt.Totals = settings.TotalsFormat;
             bool fullScreen = forced ?? settings.ClockFullScreen;
 
             store.Audit("Clock started", fullScreen ? "kiosk mode" : "windowed mode");
