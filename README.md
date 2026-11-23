@@ -35,6 +35,18 @@ PunchPoint is a standalone Windows app that:
 | **Reports** | Payroll CSV, daily detail CSV, punch CSV, printable time cards |
 | **Settings** | Pay periods, rounding, overtime, day-change, shifts, holidays, backups |
 
+## Which file to use
+
+| Work PC | Build |
+|---|---|
+| Any normal Intel/AMD Windows 10 or 11 PC | `dist/win-x64/PunchPoint.exe` |
+| Windows on ARM (Surface Pro X, Parallels/VMware ARM VM) | `dist/win-arm64/PunchPoint.exe` |
+
+The x64 build is a native 64-bit Intel executable (PE32+ x86-64) with the x64 SQLite
+library embedded — no emulation, no runtime install. The ARM build exists only for
+ARM-based Windows machines; an ARM PC can also run the x64 build under Windows' built-in
+emulation if you prefer one file for everyone.
+
 ## Install and run
 
 1. Copy `PunchPoint.exe` to the work PC (Desktop, or `C:\PunchPoint`).
