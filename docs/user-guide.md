@@ -1,5 +1,21 @@
 # PunchPoint — user guide
 
+## First run
+
+PunchPoint is two programs:
+
+* **PunchPointClock.exe** — the employee clock. Full screen, PIN pad only. It cannot be
+  closed without the supervisor password (or the **Supervisor** button in the bottom-right
+  corner, which asks for it).
+* **PunchPoint.exe** — the management app. It asks for the supervisor password every time
+  it starts, and creates one on first run.
+
+Keep both files in the same folder. In the admin app, **Open clock** starts the kiosk, and
+Settings → *Start the clock automatically* makes Windows launch the clock at sign-in.
+
+Leave the clock running on the work PC. Employees cannot reach employees, time cards,
+imports or settings from it — those only exist in the password-protected app.
+
 ## Every day
 
 **Employees clock in and out on the Clock screen.** They type their PIN and press
@@ -98,11 +114,15 @@ Reports. All files open in Excel or Google Sheets.
 * **All punches** — the raw events, for auditing or another system.
 * **Print all time cards** — one page per employee with signature lines.
 
-## Supervisor PIN
+## Supervisor password
 
-Settings → Company → **Supervisor PIN**. When set, opening Employees, Time Cards, Punches,
-Import, Reports or Settings asks for it. Leave it blank for no restriction. The Clock screen
-is never locked, so employees can always clock in.
+Settings → Company → **Change supervisor password**. The whole management app is locked
+behind this password, and the clock uses it to allow closing. If you ever forget it, restore
+a backup from before it was set (or contact whoever keeps the backups) — it cannot be read
+out of the database.
+
+Closing the clock: press **Ctrl+Shift+E**, or click **Supervisor** in the bottom-right
+corner, then enter the password.
 
 ## Backups
 

@@ -15,11 +15,11 @@ COMMON=(-c Release --self-contained true
 echo "== tests =="
 dotnet test tests/PunchPoint.Core.Tests -v quiet
 
-echo "== windows x64 =="
-dotnet publish src/PunchPoint.App "${COMMON[@]}" -r win-x64 -o "dist/win-x64"
-
-echo "== windows arm64 =="
-dotnet publish src/PunchPoint.App "${COMMON[@]}" -r win-arm64 -o "dist/win-arm64"
+for rid in win-x64 win-arm64; do
+  echo "== $rid =="
+  dotnet publish src/PunchPoint.App   "${COMMON[@]}" -r "$rid" -o "dist/$rid"
+  dotnet publish src/PunchPoint.Clock "${COMMON[@]}" -r "$rid" -o "dist/$rid"
+done
 
 echo "== command line tools =="
 dotnet publish src/PunchPoint.Cli -c Release -r win-x64 --self-contained true \
@@ -27,4 +27,4 @@ dotnet publish src/PunchPoint.Cli -c Release -r win-x64 --self-contained true \
 
 echo
 echo "Done. Builds:"
-ls -lh dist/win-x64/PunchPoint.exe dist/win-arm64/PunchPoint.exe 2>/dev/null || true
+ls -lh dist/win-x64/PunchPoint*.exe dist/win-arm64/PunchPoint*.exe 2>/dev/null || true

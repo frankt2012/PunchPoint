@@ -51,8 +51,30 @@ internal static class Program
             // Always have a period covering today so the first screen is useful.
             Maintenance.EnsurePeriods(store);
 
+            var settings = store.GetSettings();
+
+            // The management app is password protected. On a fresh installation the
+            // supervisor is asked to create the password before anything is shown.
+            if (tourFolder is null)
+            {
+                if (string.IsNullOrWhiteSpace(settings.AdminPasswordHash))
+                {
+                    string? created = AdminPassword.Create(null, allowCancel: false);
+                    if (created is null) return;
+
+                    settings.AdminPasswordHash = created;
+                    settings.LegacyAdminPin = "";
+                    store.SaveSettings(settings);
+                    store.Audit("Supervisor password created", Environment.UserName);
+                }
+                else if (!AdminPassword.Unlock(null, settings.AdminPasswordHash))
+                {
+                    return;
+                }
+            }
+
             var services = new AppServices(store);
-            var form = new MainForm(services, startScreen);
+            var form = new MainForm(services, startScreen ?? "dashboard");
 
             if (tourFolder is not null)
             {
@@ -121,6 +143,7 @@ public sealed class AppServices
     }
 
     public Store Store { get; }
+    public string DatabasePath => Store.Db.Path;
     public AppSettings Settings { get; set; }
     public ClockService Clock { get; }
 

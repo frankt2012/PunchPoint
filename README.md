@@ -35,6 +35,20 @@ PunchPoint is a standalone Windows app that:
 | **Reports** | Payroll CSV, daily detail CSV, punch CSV, printable time cards |
 | **Settings** | Pay periods, rounding, overtime, day-change, shifts, holidays, backups |
 
+## Two programs
+
+| Program | Who uses it | What it can do |
+|---|---|---|
+| **PunchPointClock.exe** | Employees | A full-screen PIN clock. No menus, no employee list, no time cards. It cannot be closed without the supervisor password. |
+| **PunchPoint.exe** | Supervisors | Everything else: employees, time cards, punches, import, reports, settings. Asks for the supervisor password every time it starts. |
+
+The password is stored as a PBKDF2 hash (never in plain text), and is created the first
+time the admin app runs. The clock and the admin app share one database, so punches appear
+in the admin app immediately (it refreshes every few seconds).
+
+Keep both `.exe` files in the same folder. **Open clock** in the admin app launches the
+kiosk; *Settings → Start the clock automatically* makes the clock start with Windows.
+
 ## Which file to use
 
 | Work PC | Build |
@@ -49,15 +63,16 @@ emulation if you prefer one file for everyone.
 
 ## Install and run
 
-1. Copy `PunchPoint.exe` to the work PC (Desktop, or `C:\PunchPoint`).
-2. Double-click it. No installer and no admin rights are required.
+1. Copy `PunchPoint.exe` **and** `PunchPointClock.exe` to the work PC (for example `C:\PunchPoint`).
+2. Double-click `PunchPoint.exe` and create the supervisor password when asked.
+   No installer and no admin rights are required.
 3. Your data lives in `C:\ProgramData\PunchPoint\`:
    * `punchpoint.db` — the database (SQLite)
    * `Backups\` — a copy is made once a day and before every import
    * `Logs\` — error logs, if anything ever goes wrong
 
-To start PunchPoint automatically, right-click the exe → *Send to* → *Desktop (create shortcut)*,
-then move the shortcut into `shell:startup` (Win+R → `shell:startup`).
+To have the clock start automatically, tick **Start the clock automatically** in
+Settings (it writes a per-user Run entry pointing at `PunchPointClock.exe`).
 
 ## Importing from timeQplus
 

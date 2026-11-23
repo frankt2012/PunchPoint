@@ -8,7 +8,7 @@ public sealed class SettingsScreen : ScreenBase
 {
     private readonly TextBox _company = Theme.Input(320);
     private readonly TextBox _message = Theme.Input(520);
-    private readonly TextBox _adminPin = Theme.Input(140);
+    private readonly Label _passwordStatus = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
 
     private readonly ComboBox _periodType = Theme.Dropdown(200);
     private readonly DateTimePicker _anchor = new() { Format = DateTimePickerFormat.Short, Width = 140, Font = Theme.Body };
@@ -26,7 +26,7 @@ public sealed class SettingsScreen : ScreenBase
 
     private readonly CheckBox _roundDayTotal = Theme.Check("Round the day total instead of each punch");
     private readonly CheckBox _requireApproval = Theme.Check("Warn before exporting a period that is not fully approved");
-    private readonly CheckBox _startWithWindows = Theme.Check("Start PunchPoint automatically when Windows starts");
+    private readonly CheckBox _startWithWindows = Theme.Check("Start the clock automatically when Windows starts");
     private readonly DataGridView _shifts = new();
     private readonly DataGridView _holidays = new();
     private readonly Label _dataLabel = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
@@ -72,7 +72,12 @@ public sealed class SettingsScreen : ScreenBase
         stack.Add(SectionTitle("Company"));
         stack.Add(Row("Company name", _company));
         stack.Add(Row("Message shown on the clock", _message));
-        stack.Add(Row("Supervisor PIN (blank = no PIN)", _adminPin));
+        var passwordRow = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 2, 0, 2) };
+        var changePassword = Theme.SecondaryButton("Change supervisor password…", 220);
+        changePassword.Click += (_, _) => ChangeSupervisorPassword();
+        passwordRow.Controls.Add(changePassword);
+        passwordRow.Controls.Add(_passwordStatus);
+        stack.Add(passwordRow);
         card.Controls.Add(stack);
         return card;
     }
@@ -270,7 +275,10 @@ public sealed class SettingsScreen : ScreenBase
 
         _company.Text = s.CompanyName;
         _message.Text = s.CompanyMessage;
-        _adminPin.Text = s.AdminPin;
+        _passwordStatus.Text = string.IsNullOrWhiteSpace(s.AdminPasswordHash)
+            ? "  not set — the admin app is currently unprotected"
+            : "  password is set";
+        _passwordStatus.ForeColor = string.IsNullOrWhiteSpace(s.AdminPasswordHash) ? Theme.Warning : Theme.TextMuted;
 
         _periodType.SelectedIndex = (int)s.PeriodType;
         _anchor.Value = s.PeriodAnchor;
@@ -380,13 +388,27 @@ public sealed class SettingsScreen : ScreenBase
         LoadHolidays();
     }
 
+    private void ChangeSupervisorPassword()
+    {
+        string? hash = AdminPassword.Change(this, Services.Settings.AdminPasswordHash);
+        if (hash is null) return;
+
+        var settings = Services.Store.GetSettings();
+        settings.LegacyAdminPin = "";
+        settings.AdminPasswordHash = hash;
+        Services.Store.SaveSettings(settings);
+        Services.Store.Audit("Supervisor password changed", "");
+        Services.NotifyDataChanged();
+
+        PromptDialog.Info(this, "Supervisor password updated. It will be required the next time the app starts.");
+    }
+
     private void SaveSettings()
     {
         var s = Services.Store.GetSettings();
 
         s.CompanyName = _company.Text.Trim();
         s.CompanyMessage = _message.Text.Trim();
-        s.AdminPin = _adminPin.Text.Trim();
 
         s.PeriodType = (PayPeriodType)Math.Max(0, _periodType.SelectedIndex);
         s.PeriodAnchor = _anchor.Value.Date;
@@ -473,7 +495,12 @@ public sealed class SettingsScreen : ScreenBase
             if (key is null) return;
 
             if (enabled)
-                key.SetValue(RunValueName, "\"" + Application.ExecutablePath + "\"");
+            {
+                // Start the employee clock, never the password-protected admin app.
+                string clock = Path.Combine(AppContext.BaseDirectory, "PunchPointClock.exe");
+                string target = File.Exists(clock) ? clock : Application.ExecutablePath;
+                key.SetValue(RunValueName, "\"" + target + "\"");
+            }
             else
                 key.DeleteValue(RunValueName, throwOnMissingValue: false);
         }

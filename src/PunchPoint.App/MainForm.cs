@@ -10,7 +10,6 @@ public sealed class MainForm : Form
     private readonly Dictionary<string, UserControl> _screens = new();
     private readonly Dictionary<string, Button> _navButtons = new();
     private string _current = "";
-    private bool _adminUnlocked;
 
     /// <summary>Screen to open first (diagnostic/technician option).</summary>
     public string? StartScreen { get; set; }
@@ -20,7 +19,7 @@ public sealed class MainForm : Form
 
     private static readonly (string Key, string Label, bool Admin)[] Nav =
     {
-        ("clock", "Clock", false),
+        ("clock", "Open clock", false),
         ("dashboard", "Dashboard", false),
         ("employees", "Employees", true),
         ("timecards", "Time Cards", true),
@@ -62,7 +61,7 @@ public sealed class MainForm : Form
 
         _services.DataChanged += () => { if (CurrentScreen is IRefreshable r) r.RefreshData(); };
 
-        Show(string.IsNullOrWhiteSpace(startScreen) ? "clock" : startScreen!);
+        Show(string.IsNullOrWhiteSpace(startScreen) ? "dashboard" : startScreen!);
     }
 
     private Control BuildNav()
@@ -150,35 +149,48 @@ public sealed class MainForm : Form
 
     private void TryShow(string key)
     {
-        var definition = Nav.First(n => n.Key == key);
-
-        if (definition.Admin && !EnsureAdmin())
+        if (key == "clock")
+        {
+            LaunchClock();
             return;
+        }
 
         Show(key);
     }
 
-    private bool EnsureAdmin()
+    /// <summary>Opens the separate employee clock window (its own process, no admin UI).</summary>
+    private void LaunchClock()
     {
-        if (_adminUnlocked) return true;
-
-        string? configured = _services.Settings.AdminPin;
-        if (string.IsNullOrWhiteSpace(configured)) return true;
-
-        string? entered = PromptDialog.AskPassword(this,
-            "Supervisor access",
-            "Enter the supervisor PIN to manage employees, time cards and settings.");
-
-        if (entered is null) return false;
-        if (entered.Trim() == configured.Trim())
+        string path = Path.Combine(AppContext.BaseDirectory, "PunchPointClock.exe");
+        if (!File.Exists(path))
         {
-            _adminUnlocked = true;
-            return true;
+            PromptDialog.Warn(this,
+                "PunchPointClock.exe was not found next to PunchPoint.exe.\n\n" +
+                "Keep both files in the same folder (as in the distributed zip).");
+            return;
         }
 
-        MessageBox.Show(this, "That PIN is not correct.", "PunchPoint",
-            MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        return false;
+        try
+        {
+            var start = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = path,
+                UseShellExecute = true,
+                WorkingDirectory = AppContext.BaseDirectory,
+            };
+
+            if (!string.IsNullOrWhiteSpace(_services.DatabasePath))
+            {
+                start.Arguments = $"--db \"{_services.DatabasePath}\"";
+                start.UseShellExecute = false;
+            }
+
+            System.Diagnostics.Process.Start(start);
+        }
+        catch (Exception ex)
+        {
+            PromptDialog.Warn(this, "Could not start the clock window: " + ex.Message);
+        }
     }
 
     public void Show(string key)
@@ -187,7 +199,6 @@ public sealed class MainForm : Form
         {
             UserControl screen = key switch
             {
-                "clock" => new ClockScreen(_services),
                 "dashboard" => new DashboardScreen(_services),
                 "employees" => new EmployeesScreen(_services),
                 "timecards" => new TimeCardsScreen(_services),

@@ -4,21 +4,21 @@ namespace PunchPoint.App.UI;
 
 public static class PromptDialog
 {
-    public static string? AskText(IWin32Window owner, string title, string label, string initial = "")
+    public static string? AskText(IWin32Window? owner, string title, string label, string initial = "")
     {
         var (form, input) = Build(title, label, initial, password: false);
         using (form)
             return form.ShowDialog(owner) == DialogResult.OK ? input.Text.Trim() : null;
     }
 
-    public static string? AskPassword(IWin32Window owner, string title, string label)
+    public static string? AskPassword(IWin32Window? owner, string title, string label)
     {
         var (form, input) = Build(title, label, "", password: true);
         using (form)
             return form.ShowDialog(owner) == DialogResult.OK ? input.Text : null;
     }
 
-    public static int? AskInt(IWin32Window owner, string title, string label, int initial, int min = int.MinValue, int max = int.MaxValue)
+    public static int? AskInt(IWin32Window? owner, string title, string label, int initial, int min = int.MinValue, int max = int.MaxValue)
     {
         while (true)
         {
@@ -32,13 +32,13 @@ public static class PromptDialog
         }
     }
 
-    public static void Warn(IWin32Window owner, string message) =>
+    public static void Warn(IWin32Window? owner, string message) =>
         MessageBox.Show(owner, message, "PunchPoint", MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
-    public static void Info(IWin32Window owner, string message) =>
+    public static void Info(IWin32Window? owner, string message) =>
         MessageBox.Show(owner, message, "PunchPoint", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-    public static bool Confirm(IWin32Window owner, string message) =>
+    public static bool Confirm(IWin32Window? owner, string message) =>
         MessageBox.Show(owner, message, "PunchPoint", MessageBoxButtons.YesNo, MessageBoxIcon.Question,
             MessageBoxDefaultButton.Button2) == DialogResult.Yes;
 

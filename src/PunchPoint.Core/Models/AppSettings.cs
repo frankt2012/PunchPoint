@@ -7,8 +7,11 @@ public sealed class AppSettings
     public string CompanyName { get; set; } = "My Company";
     public string CompanyMessage { get; set; } = "";
 
-    /// <summary>PIN required to open the management screens. Empty means no gate.</summary>
-    public string AdminPin { get; set; } = "";
+    /// <summary>Hashed supervisor password. Empty means the admin app is not protected yet.</summary>
+    public string AdminPasswordHash { get; set; } = "";
+
+    /// <summary>Legacy plaintext PIN from earlier builds; migrated on first save.</summary>
+    public string LegacyAdminPin { get; set; } = "";
 
     public PayPeriodType PeriodType { get; set; } = PayPeriodType.Weekly;
     /// <summary>Start date of the current (or next) pay period.</summary>

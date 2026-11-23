@@ -13,6 +13,7 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\PunchPoint.Core\PunchPoint.Core.csproj" />
+    <ProjectReference Include="..\PunchPoint.Ui\PunchPoint.Ui.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Resources\punchpoint.ico" />

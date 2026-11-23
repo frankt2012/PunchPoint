@@ -48,7 +48,8 @@ public sealed class Store
         {
             CompanyName = r.GetStringOrNull("company_name") ?? "My Company",
             CompanyMessage = r.GetStringOrNull("company_message") ?? "",
-            AdminPin = r.GetStringOrNull("admin_pin") ?? "",
+            LegacyAdminPin = r.GetStringOrNull("admin_pin") ?? "",
+            AdminPasswordHash = r.HasColumn("admin_password") ? r.GetStringOrNull("admin_password") ?? "" : "",
             PeriodType = (PayPeriodType)r.GetInt("period_type"),
             PeriodAnchor = DateTime.Parse(r.GetStringOrNull("period_anchor") ?? "2000-01-01", CultureInfo.InvariantCulture),
             SemiMonthlySplitDay = r.GetInt("semi_monthly_split", 16),
@@ -76,7 +77,8 @@ public sealed class Store
     {
         _db.Execute("""
             UPDATE settings SET
-                company_name = $company, company_message = $message, admin_pin = $adminPin,
+                company_name = $company, company_message = $message,
+                admin_pin = $legacyPin, admin_password = $adminPassword,
                 period_type = $periodType, period_anchor = $anchor,
                 semi_monthly_split = $split, monthly_start_day = $monthly,
                 rounding_minutes = $round, round_in_mode = $roundIn, round_out_mode = $roundOut,
@@ -87,7 +89,8 @@ public sealed class Store
                 last_backup_path = $backup
             WHERE id = 1;
             """,
-            ("$company", s.CompanyName), ("$message", s.CompanyMessage), ("$adminPin", s.AdminPin),
+            ("$company", s.CompanyName), ("$message", s.CompanyMessage),
+            ("$legacyPin", s.LegacyAdminPin), ("$adminPassword", s.AdminPasswordHash),
             ("$periodType", (int)s.PeriodType), ("$anchor", FormatDate(s.PeriodAnchor)),
             ("$split", s.SemiMonthlySplitDay), ("$monthly", s.MonthlyStartDay),
             ("$round", s.RoundingMinutes), ("$roundIn", (int)s.RoundInMode), ("$roundOut", (int)s.RoundOutMode),

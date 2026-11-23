@@ -4,7 +4,7 @@ namespace PunchPoint.Core.Storage;
 
 public static class Schema
 {
-    public const int CurrentVersion = 1;
+    public const int CurrentVersion = 2;
 
     public static void Ensure(Database db)
     {
@@ -16,8 +16,19 @@ public static class Schema
             SetVersion(db, 1);
         }
 
-        // Future migrations go here:
-        // if (version < 2) { MigrateV2(db); SetVersion(db, 2); }
+        if (version < 2)
+        {
+            // The supervisor PIN (plaintext) became a hashed password.
+            try
+            {
+                db.Execute("ALTER TABLE settings ADD COLUMN admin_password TEXT NOT NULL DEFAULT '';");
+            }
+            catch
+            {
+                // column already present
+            }
+            SetVersion(db, 2);
+        }
     }
 
     private static int GetVersion(Database db)
@@ -45,6 +56,7 @@ public static class Schema
                 company_name        TEXT NOT NULL DEFAULT '',
                 company_message     TEXT NOT NULL DEFAULT '',
                 admin_pin           TEXT NOT NULL DEFAULT '',
+                admin_password      TEXT NOT NULL DEFAULT '',
                 period_type         INTEGER NOT NULL DEFAULT 0,
                 period_anchor       TEXT NOT NULL,
                 semi_monthly_split  INTEGER NOT NULL DEFAULT 16,
