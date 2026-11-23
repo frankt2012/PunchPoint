@@ -9,7 +9,7 @@ public sealed class SettingsScreen : ScreenBase
     private readonly TextBox _company = Theme.Input(320);
     private readonly TextBox _message = Theme.Input(520);
     private readonly Label _passwordStatus = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
-    private readonly ComboBox _clockMode = Theme.Dropdown(360);
+    private readonly ComboBox _clockMode = Theme.Dropdown(470);
 
     private readonly ComboBox _periodType = Theme.Dropdown(200);
     private readonly DateTimePicker _anchor = new() { Format = DateTimePickerFormat.Short, Width = 140, Font = Theme.Body };
@@ -77,7 +77,7 @@ public sealed class SettingsScreen : ScreenBase
         stack.Add(Row("Company name", _company));
         stack.Add(Row("Message shown on the clock", _message));
         var passwordRow = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 2, 0, 2) };
-        var changePassword = Theme.SecondaryButton("Change supervisor password…", 220);
+        var changePassword = Theme.SecondaryButton("Change password", 200);
         changePassword.Click += (_, _) => ChangeSupervisorPassword();
         passwordRow.Controls.Add(changePassword);
         passwordRow.Controls.Add(_passwordStatus);
@@ -95,8 +95,8 @@ public sealed class SettingsScreen : ScreenBase
         });
         _clockMode.Items.AddRange(new object[]
         {
-            "Windowed — employees can use other programs on this PC",
-            "Full screen kiosk — locked to the clock until the password is entered",
+            "Windowed — use other programs on this PC",
+            "Full screen kiosk — locked to the clock",
         });
         clockRow.Controls.Add(_clockMode);
         stack.Add(clockRow);

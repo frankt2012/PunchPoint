@@ -56,7 +56,7 @@ public sealed class TimeCardsScreen : ScreenBase
             Padding = new Padding(0),
         };
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 76));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
         layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 54));
 
         var gridCard = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Surface, Padding = new Padding(14) };
@@ -160,7 +160,28 @@ public sealed class TimeCardsScreen : ScreenBase
             if (_periods.Count > 0) _period.SelectedIndex = periodIndex;
 
             if (_employee.Items.Count > 0 && (first || _employee.SelectedIndex < 0))
-                _employee.SelectedIndex = 0;
+            {
+                var ordered = _employees.OrderBy(e => e.SortName).ToList();
+                int index = -1;
+
+                // Prefer someone who actually has punches in this period.
+                var period = _periods.Count > 0 && _period.SelectedIndex >= 0 ? _periods[_period.SelectedIndex] : null;
+                if (period is not null)
+                {
+                    for (int i = 0; i < ordered.Count; i++)
+                    {
+                        if (Services.Store.ListPunches(ordered[i].Id, period.Start, period.End.AddDays(1)).Count > 0)
+                        {
+                            index = i;
+                            break;
+                        }
+                    }
+                }
+
+                if (index < 0) index = ordered.FindIndex(e => e.IsActive);
+                if (index < 0) index = 0;
+                _employee.SelectedIndex = index;
+            }
         }
         finally
         {
@@ -244,14 +265,14 @@ public sealed class TimeCardsScreen : ScreenBase
 
         var settings = Services.Settings;
         _totals.Text =
-            $"Regular {HoursText(result.RegularMinutes)}     " +
-            $"Overtime 1 {HoursText(result.OverTime1Minutes)}     " +
-            $"Overtime 2 {HoursText(result.OverTime2Minutes)}     " +
-            $"Vacation {HoursText(vacation)}     " +
-            $"Sick {HoursText(sick)}     " +
-            $"Other {HoursText(other)}     " +
-            $"Holiday {HoursText(result.HolidayMinutes)}     " +
-            $"TOTAL {HoursText(result.TotalMinutes)}";
+            $"Regular {HoursText(result.RegularMinutes)}    " +
+            $"OT1 {HoursText(result.OverTime1Minutes)}    " +
+            $"OT2 {HoursText(result.OverTime2Minutes)}    " +
+            $"Holiday {HoursText(result.HolidayMinutes)}    " +
+            $"TOTAL {HoursText(result.TotalMinutes)}\n" +
+            $"Vacation {HoursText(vacation)}    " +
+            $"Sick {HoursText(sick)}    " +
+            $"Other {HoursText(other)}";
 
         var issues = result.Issues.Count;
         _status.Text = issues == 0
@@ -264,7 +285,7 @@ public sealed class TimeCardsScreen : ScreenBase
         _approve.ForeColor = Color.White;
 
         if (_grid.Rows.Count == 0)
-            _grid.Rows.Add("", "", "No punches in this period", "", "", "");
+            _grid.Rows.Add("", "", "", "", "", "No punches in this period");
     }
 
     private string HoursText(int minutes) =>

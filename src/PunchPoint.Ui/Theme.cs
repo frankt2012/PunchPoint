@@ -329,7 +329,8 @@ public sealed class StackPanel : TableLayoutPanel
     {
         RowCount++;
         RowStyles.Add(new RowStyle(SizeType.AutoSize));
-        control.Dock = DockStyle.Top;
+        // Buttons keep their designed width; panels/labels fill the stack.
+        control.Dock = control is Button ? DockStyle.None : DockStyle.Top;
         control.Margin = new Padding(0, 0, 0, _spacing);
         Controls.Add(control, 0, RowCount - 1);
         return control;

@@ -31,6 +31,7 @@ internal sealed class ScreenTour
     private readonly AppServices _services;
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 900 };
     private int _index = -1;
+    private bool _busy;
     private readonly StringBuilder _report = new();
 
     public ScreenTour(MainForm form, string folder, string dbPath, AppServices services)
@@ -50,6 +51,20 @@ internal sealed class ScreenTour
     }
 
     private void Next()
+    {
+        if (_busy) return;
+        _busy = true;
+        try
+        {
+            NextCore();
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private void NextCore()
     {
         _index++;
         if (_index >= Screens.Length)
@@ -88,8 +103,10 @@ internal sealed class ScreenTour
     /// </summary>
     private void CaptureWindowedLayouts()
     {
+        _report.AppendLine("windowed: starting");
         try
         {
+            _report.AppendLine($"windowed: state={_form.WindowState} size={_form.Size}");
             _form.WindowState = FormWindowState.Normal;
             _form.Size = new Size(1180, 780);
             _form.Location = new Point(40, 40);
@@ -128,7 +145,8 @@ internal sealed class ScreenTour
         }
         catch (Exception ex)
         {
-            _report.AppendLine($"windowed capture failed: {ex.GetType().Name}: {ex.Message}");
+            _report.AppendLine($"windowed capture FAILED {ex.GetType().Name}: {ex.Message}");
+            _report.AppendLine(ex.StackTrace ?? "");
         }
     }
 

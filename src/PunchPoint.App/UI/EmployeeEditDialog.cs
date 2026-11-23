@@ -31,7 +31,7 @@ public sealed class EmployeeEditDialog : EditorDialog
     public EmployeeEditDialog(AppServices services, Employee? employee)
         : base(employee is null ? "Add employee" : "Edit employee",
             employee is null ? "Create a profile so this person can clock in" : "Update this employee’s details",
-            700, 820)
+            700, 760)
     {
         _services = services;
         _isNew = employee is null;
@@ -42,16 +42,13 @@ public sealed class EmployeeEditDialog : EditorDialog
         stack.Add(grid);
         Body.Controls.Add(stack);
 
-        var nameRow = new TableLayoutPanel { ColumnCount = 3, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0) };
-        nameRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        nameRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 96));
-        nameRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        _first.Dock = DockStyle.Fill;
+        var nameRow = new TableLayoutPanel { ColumnCount = 2, AutoSize = true, Dock = DockStyle.Fill, Margin = new Padding(0) };
+        nameRow.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 90));
+        nameRow.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
         _middle.Dock = DockStyle.Fill;
         _last.Dock = DockStyle.Fill;
-        nameRow.Controls.Add(_first, 0, 0);
-        nameRow.Controls.Add(_middle, 1, 0);
-        nameRow.Controls.Add(_last, 2, 0);
+        nameRow.Controls.Add(_middle, 0, 0);
+        nameRow.Controls.Add(_last, 1, 0);
 
         AddRow(grid, "First name", _first);
         AddRow(grid, "Middle / last", nameRow);
