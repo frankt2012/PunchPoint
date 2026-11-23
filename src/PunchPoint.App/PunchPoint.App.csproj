@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net11.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>PunchPoint.App</RootNamespace>
+    <AssemblyName>PunchPoint</AssemblyName>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Resources\punchpoint.ico</ApplicationIcon>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PunchPoint.Core\PunchPoint.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Resources\punchpoint.ico" />
+  </ItemGroup>
+</Project>

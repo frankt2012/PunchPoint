@@ -1,0 +1,256 @@
+using PunchPoint.App.UI;
+using PunchPoint.App.UI.Screens;
+
+namespace PunchPoint.App;
+
+public sealed class MainForm : Form
+{
+    private readonly AppServices _services;
+    private readonly Panel _content;
+    private readonly Dictionary<string, UserControl> _screens = new();
+    private readonly Dictionary<string, Button> _navButtons = new();
+    private string _current = "";
+    private bool _adminUnlocked;
+
+    private static readonly (string Key, string Label, bool Admin)[] Nav =
+    {
+        ("clock", "Clock", false),
+        ("dashboard", "Dashboard", false),
+        ("employees", "Employees", true),
+        ("timecards", "Time Cards", true),
+        ("punches", "Punches", true),
+        ("import", "Import", true),
+        ("reports", "Reports", true),
+        ("settings", "Settings", true),
+    };
+
+    public MainForm(AppServices services)
+    {
+        _services = services;
+
+        Text = "PunchPoint — Time & Attendance";
+        StartPosition = FormStartPosition.CenterScreen;
+        MinimumSize = new Size(1120, 720);
+        Size = new Size(1360, 880);
+        BackColor = Theme.Canvas;
+        Font = Theme.Body;
+        Icon = LoadIcon();
+
+        var root = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 2,
+            RowCount = 1,
+            Margin = new Padding(0),
+            Padding = new Padding(0),
+        };
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 224));
+        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+
+        root.Controls.Add(BuildNav(), 0, 0);
+
+        _content = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Canvas, Padding = new Padding(0) };
+        root.Controls.Add(_content, 1, 0);
+
+        Controls.Add(root);
+
+        _services.DataChanged += () => { if (CurrentScreen is IRefreshable r) r.RefreshData(); };
+
+        Show("clock");
+    }
+
+    private Control BuildNav()
+    {
+        var nav = new Panel { Dock = DockStyle.Fill, BackColor = Theme.NavBackground, Padding = new Padding(0) };
+
+        var brand = new Panel { Dock = DockStyle.Top, Height = 96, Padding = new Padding(22, 22, 18, 8) };
+        brand.Controls.Add(new Label
+        {
+            Text = "PunchPoint",
+            Font = new Font(Theme.Family, 16f, FontStyle.Bold),
+            ForeColor = Color.White,
+            AutoSize = true,
+            Location = new Point(22, 24),
+        });
+        brand.Controls.Add(new Label
+        {
+            Text = "TIME & ATTENDANCE",
+            Font = new Font(Theme.Family, 7.5f, FontStyle.Bold),
+            ForeColor = Color.FromArgb(0x7C, 0x8A, 0xA3),
+            AutoSize = true,
+            Location = new Point(24, 54),
+        });
+        nav.Controls.Add(brand);
+
+        var bottom = new Panel { Dock = DockStyle.Bottom, Height = 74, Padding = new Padding(20, 0, 16, 12) };
+        var company = new Label
+        {
+            Text = _services.Settings.CompanyName,
+            ForeColor = Color.FromArgb(0x94, 0xA3, 0xB8),
+            Font = Theme.Small,
+            AutoSize = false,
+            Dock = DockStyle.Bottom,
+            Height = 40,
+            TextAlign = ContentAlignment.BottomLeft,
+        };
+        bottom.Controls.Add(company);
+        nav.Controls.Add(bottom);
+
+        var list = new Panel { Dock = DockStyle.Fill, AutoScroll = true, Padding = new Padding(10, 0, 10, 0) };
+        nav.Controls.Add(list);
+
+        int top = 4;
+        foreach (var (key, label, _) in Nav)
+        {
+            var button = new Button
+            {
+                Text = "   " + label,
+                TextAlign = ContentAlignment.MiddleLeft,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Theme.NavBackground,
+                ForeColor = Theme.NavText,
+                Font = Theme.Body,
+                Height = 42,
+                Width = 194,
+                Left = 5,
+                Top = top,
+                Cursor = Cursors.Hand,
+                TabStop = false,
+            };
+            button.FlatAppearance.BorderSize = 0;
+            button.FlatAppearance.MouseOverBackColor = Theme.NavHover;
+            button.Click += (_, _) => TryShow(key);
+
+            _navButtons[key] = button;
+            list.Controls.Add(button);
+            top += 46;
+        }
+
+        return nav;
+    }
+
+    private void TryShow(string key)
+    {
+        var definition = Nav.First(n => n.Key == key);
+
+        if (definition.Admin && !EnsureAdmin())
+            return;
+
+        Show(key);
+    }
+
+    private bool EnsureAdmin()
+    {
+        if (_adminUnlocked) return true;
+
+        string? configured = _services.Settings.AdminPin;
+        if (string.IsNullOrWhiteSpace(configured)) return true;
+
+        string? entered = PromptDialog.AskPassword(this,
+            "Supervisor access",
+            "Enter the supervisor PIN to manage employees, time cards and settings.");
+
+        if (entered is null) return false;
+        if (entered.Trim() == configured.Trim())
+        {
+            _adminUnlocked = true;
+            return true;
+        }
+
+        MessageBox.Show(this, "That PIN is not correct.", "PunchPoint",
+            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        return false;
+    }
+
+    public void Show(string key)
+    {
+        if (!_screens.ContainsKey(key))
+        {
+            UserControl screen = key switch
+            {
+                "clock" => new ClockScreen(_services),
+                "dashboard" => new DashboardScreen(_services),
+                "employees" => new EmployeesScreen(_services),
+                "timecards" => new TimeCardsScreen(_services),
+                "punches" => new PunchesScreen(_services),
+                "import" => new ImportScreen(_services),
+                "reports" => new ReportsScreen(_services),
+                "settings" => new SettingsScreen(_services),
+                _ => new DashboardScreen(_services),
+            };
+
+            screen.Dock = DockStyle.Fill;
+            screen.Visible = false;
+            _content.Controls.Add(screen);
+            _screens[key] = screen;
+        }
+
+        foreach (var (k, control) in _screens)
+            control.Visible = k == key;
+
+        foreach (var (k, button) in _navButtons)
+        {
+            bool active = k == key;
+            button.BackColor = active ? Theme.NavActive : Theme.NavBackground;
+            button.ForeColor = active ? Theme.NavTextActive : Theme.NavText;
+            button.Font = active ? Theme.BodyBold : Theme.Body;
+        }
+
+        _current = key;
+
+        if (_screens[key] is IRefreshable refreshable)
+            refreshable.RefreshData();
+
+        _screens[key].BringToFront();
+    }
+
+    private UserControl? CurrentScreen =>
+        _current.Length > 0 && _screens.TryGetValue(_current, out var screen) ? screen : null;
+
+    private static Icon? LoadIcon()
+    {
+        try
+        {
+            string path = Path.Combine(AppContext.BaseDirectory, "Resources", "punchpoint.ico");
+            if (File.Exists(path)) return new Icon(path);
+            return Icon.ExtractAssociatedIcon(Application.ExecutablePath);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        if (e.CloseReason == CloseReason.UserClosing)
+        {
+            var answer = MessageBox.Show(this,
+                "Close PunchPoint? Employees will not be able to clock in until it is opened again.",
+                "PunchPoint", MessageBoxButtons.YesNo, MessageBoxIcon.Question,
+                MessageBoxDefaultButton.Button2);
+
+            if (answer != DialogResult.Yes)
+            {
+                e.Cancel = true;
+                return;
+            }
+        }
+
+        try
+        {
+            _services.Store.Audit("Application closed", "");
+        }
+        catch
+        {
+            // ignore
+        }
+
+        base.OnFormClosing(e);
+    }
+}
+
+public interface IRefreshable
+{
+    void RefreshData();
+}

@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PunchPoint.Core/PunchPoint.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PunchPoint.Core.Tests/PunchPoint.Core.Tests.csproj" />
+  </Folder>
+</Solution>

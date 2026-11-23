@@ -1,0 +1,25 @@
+## Build output
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+## Publish output
+dist/
+artifacts/
+
+## Local databases / test data
+*.db
+*.db-wal
+*.db-shm
+!tests/**/*.db
+Data/
+scratch/
+
+## macOS
+.DS_Store
+
+## Secrets / local config
+*.local.json
+.env
