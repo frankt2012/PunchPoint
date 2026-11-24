@@ -40,7 +40,10 @@ echo "==> Version $version"
 perl -pi -e "s|<Version>[^<]*</Version>|<Version>$version</Version>|" Directory.Build.props
 
 git add Directory.Build.props
-git commit -q -m "Version $version"
+if ! git diff --cached --quiet; then
+  git commit -q -m "Version $version"
+fi
+
 git tag -a "v$version" -m "PunchPoint $version"
 
 echo "==> Pushing"
