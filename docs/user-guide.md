@@ -165,13 +165,6 @@ your inbox (and optionally in each employee's).
 If you later want a live view from home, the safe way to add it is a private mesh such as
 Tailscale — no ports opened, encrypted end to end.
 
-## Missing punches
-
-Punch Editing → **Fix missing…** finds the days where a clock-in has no clock-out (or the other
-way round) and proposes a time — the shift's start or stop, or eight hours from the punch that
-exists. Untick anything that is wrong, then **Add selected punches**. Each fix is recorded in
-the activity log.
-
 ## Attendance
 
 Reports → **Attendance** shows punctuality for the period: work days, days late, how many

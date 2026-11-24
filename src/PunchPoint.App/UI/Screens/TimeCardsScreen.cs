@@ -37,11 +37,6 @@ public sealed class TimeCardsScreen : ScreenBase
         _period.SelectedIndexChanged += (_, _) => LoadEmployee();
         Actions.Controls.Add(_period);
 
-        var fixMissing = Theme.SecondaryButton("Fix missing…", 120);
-        fixMissing.Margin = new Padding(0, 5, 6, 0);
-        fixMissing.Click += (_, _) => FixMissingPunches();
-        Actions.Controls.Add(fixMissing);
-
         var add = Theme.PrimaryButton("Add punch", 110);
         add.Margin = new Padding(0, 5, 6, 0);
         add.Click += (_, _) => AddPunch();
@@ -310,33 +305,6 @@ public sealed class TimeCardsScreen : ScreenBase
 
     private Punch? SelectedPunch =>
         _grid.SelectedRows.Count > 0 ? _grid.SelectedRows[0].Tag as Punch : null;
-
-    private void FixMissingPunches()
-    {
-        var employee = SelectedEmployee;
-        var period = SelectedPeriod;
-        if (employee is null || period is null) return;
-
-        using var dialog = new MissingPunchDialog(Services, employee, period);
-        if (dialog.ShowDialog(this) != DialogResult.OK) return;
-
-        foreach (var suggestion in dialog.Accepted)
-        {
-            Services.Store.InsertPunch(new Punch
-            {
-                EmployeeId = employee.Id,
-                Timestamp = suggestion.Suggested,
-                Kind = suggestion.Kind,
-                Source = PunchSource.Manual,
-                Comment = "Missing punch fixed",
-            });
-        }
-
-        Services.Store.Audit("Missing punches added",
-            $"{employee.SortName}: {dialog.Accepted.Count} punch(es) for {period.Label}");
-        Services.NotifyDataChanged();
-        LoadEmployee();
-    }
 
     private void AddPunch()
     {
