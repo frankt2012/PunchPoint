@@ -27,6 +27,12 @@ if git rev-parse "v$version" >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! grep -qE "^## $version([^0-9.]|$)" CHANGELOG.md; then
+  echo "CHANGELOG.md has no section for $version." >&2
+  echo "Add '## $version — <date>' with What's new / Fixes first: release notes come from it." >&2
+  exit 1
+fi
+
 echo "==> Tests"
 dotnet test tests/PunchPoint.Core.Tests -c Release --nologo
 
@@ -42,8 +48,11 @@ git push origin main
 git push origin "v$version"
 
 echo
-echo "Pushed v$version. GitHub Actions builds the installers:"
+echo "Pushed v$version. GitHub Actions builds a DRAFT release with notes from CHANGELOG.md:"
 echo "  gh run watch"
 echo "  gh release view v$version"
 echo
-echo "Once the release is published, running copies of PunchPoint will offer $version."
+echo "Install and test that build first. Then publish it with:"
+echo "  scripts/publish-release.sh $version"
+echo
+echo "Until published, running copies of PunchPoint will not be offered $version."

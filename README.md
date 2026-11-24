@@ -130,9 +130,14 @@ The script runs the tests, publishes both programs, packs them as the installer 
 produces `dist/PunchPoint-Setup-1.0.0.exe`. Only the .NET SDK, `zip` and the repo are needed
 — no Windows machine.
 
-Pushing a tag (`git tag v1.0.0 && git push --tags`) makes GitHub Actions test the code,
-publish for x64 and ARM64, build the installer and attach the installer plus both portable
-zips to a release automatically.
+Pushing a tag (`scripts/release.sh 1.5.3`) makes GitHub Actions test the code, publish for
+x64 and ARM64, build the installer and attach everything to a **draft** release whose notes
+come from [CHANGELOG.md](CHANGELOG.md). Installed copies are only offered the version once the
+draft is tested and published:
+
+```bash
+scripts/publish-release.sh 1.5.3
+```
 
 ## Run without installing
 

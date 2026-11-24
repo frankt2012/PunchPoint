@@ -240,6 +240,7 @@ public sealed class SetupForm : Form
             SetStatus("Creating shortcuts…", 60);
             CreateShortcuts(target);
             RefreshShellIcons();
+            RepairDataFolderPermissions();
 
             SetStatus("Registering with Windows…", 75);
             WriteRegistry(target);
@@ -260,7 +261,16 @@ public sealed class SetupForm : Form
             {
                 string app = Path.Combine(target, "PunchPoint.exe");
                 if (File.Exists(app))
-                    Process.Start(new ProcessStartInfo(app) { UseShellExecute = true, WorkingDirectory = target });
+                {
+                    // Launch through Explorer so the app runs with the logged-on user's token.
+                    // Starting it directly would inherit this installer's administrator token;
+                    // the app would then create or open the database as Administrator and the
+                    // employee clock (running as the user) could no longer write to it.
+                    Process.Start(new ProcessStartInfo("explorer.exe", $"\"{app}\"")
+                    {
+                        UseShellExecute = true,
+                    });
+                }
             }
 
             Close();
@@ -335,6 +345,36 @@ public sealed class SetupForm : Form
     /// icon in its cache and the shortcuts keep showing it. Tell the shell the icons changed
     /// and rebuild the cache so the new artwork appears straight away.
     /// </summary>
+    /// <summary>
+    /// Older installers opened the app as Administrator once, which left
+    /// %ProgramData%\PunchPoint and its database owned by that account. The employee clock then
+    /// failed with "unable to open database file" / "readonly database". Give the built-in
+    /// Users group modify rights on the data folder so both programs can use it again.
+    /// </summary>
+    private static void RepairDataFolderPermissions()
+    {
+        string data = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "PunchPoint");
+
+        if (!Directory.Exists(data)) return; // first run: the app creates it as the user
+
+        try
+        {
+            var process = Process.Start(new ProcessStartInfo("icacls")
+            {
+                Arguments = $"\"{data}\" /grant *S-1-5-32-545:(OI)(CI)M /T /C /Q",
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                WindowStyle = ProcessWindowStyle.Hidden,
+            });
+            process?.WaitForExit(15_000);
+        }
+        catch
+        {
+            // Not fatal: the app still runs, it just keeps the previous permissions.
+        }
+    }
+
     private static void RefreshShellIcons()
     {
         const int SHCNE_ASSOCCHANGED = 0x08000000;
