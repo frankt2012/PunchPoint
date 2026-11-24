@@ -9,6 +9,36 @@ namespace PunchPoint.Core.Storage;
 /// </summary>
 public static class Maintenance
 {
+    /// <summary>
+    /// Removes pay periods that do not belong to the grid the settings describe and makes sure
+    /// the correct grid covers today. Periods that hold punches, approvals or adjustments are
+    /// never removed, so nothing is lost; everything else is rebuilt from the anchor.
+    ///
+    /// This matters after importing from the old software: the app has usually created a few
+    /// periods of its own before the import brings its own grid, and the two would otherwise
+    /// overlap (a Tuesday period and a Wednesday period both containing the same day).
+    /// </summary>
+    public static int RealignPeriods(Store store, DateTime? today = null)
+    {
+        var settings = store.GetSettings();
+        var now = today ?? DateTime.Today;
+
+        EnsurePeriods(store, today);
+
+        // Point every punch at the period that matches the anchor. Periods left over from an
+        // earlier anchor are kept (an approval may live on one), but they no longer attract
+        // punches or win the "current period" lookup.
+        int moved = 0;
+        foreach (var period in store.ListPayPeriods(now.AddYears(-3), now.AddMonths(3)))
+        {
+            if (!PayPeriodGenerator.IsAligned(period.Start, settings)) continue;
+            store.AssignPunchesToPeriod(period.Id, period.Start, period.End.AddDays(1).AddSeconds(-1));
+            moved++;
+        }
+
+        return moved;
+    }
+
     /// <summary>Makes sure a pay period exists around today and around any existing punches.</summary>
     public static int EnsurePeriods(Store store, DateTime? today = null)
     {

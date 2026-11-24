@@ -50,7 +50,7 @@ internal static class Program
             Maintenance.DailyBackup(database);
 
             // Always have a period covering today so the first screen is useful.
-            Maintenance.EnsurePeriods(store);
+            Maintenance.RealignPeriods(store);
 
             var settings = store.GetSettings();
 

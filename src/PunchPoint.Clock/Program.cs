@@ -40,7 +40,7 @@ internal static class Program
             var store = new Store(database);
 
             Maintenance.DailyBackup(database);
-            Maintenance.EnsurePeriods(store);
+            Maintenance.RealignPeriods(store);
 
             // Windowed by default (shared PC); kiosk mode is opt-in and can be forced
             // per shortcut with --kiosk / --windowed.

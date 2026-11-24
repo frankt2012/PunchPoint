@@ -42,8 +42,16 @@ public sealed class Store
     // Settings
     // =====================================================================
 
+    // Reading the settings for every punch during an import added up; a one-second cache is
+    // fresh enough for a UI and keeps a 28,000-punch import quick.
+    private AppSettings? _settingsCache;
+    private DateTime _settingsCacheAt;
+
     public AppSettings GetSettings()
     {
+        if (_settingsCache is not null && (DateTime.UtcNow - _settingsCacheAt).TotalSeconds < 1.0)
+            return _settingsCache;
+
         var rows = _db.Query("SELECT * FROM settings WHERE id = 1;", r => new AppSettings
         {
             CompanyName = r.GetStringOrNull("company_name") ?? "My Company",
@@ -97,7 +105,9 @@ public sealed class Store
             LastBackupPath = r.GetStringOrNull("last_backup_path") ?? "",
         });
 
-        return rows.Count > 0 ? rows[0] : new AppSettings();
+        _settingsCache = rows.Count > 0 ? rows[0] : new AppSettings();
+        _settingsCacheAt = DateTime.UtcNow;
+        return _settingsCache;
     }
 
     public void SaveSettings(AppSettings s)
@@ -162,6 +172,8 @@ public sealed class Store
             ("$retention", s.BackupRetention),
             ("$mirror", s.BackupMirrorFolder),
             ("$backup", s.LastBackupPath));
+        _settingsCache = s;
+        _settingsCacheAt = DateTime.UtcNow;
     }
 
     // =====================================================================
@@ -544,11 +556,20 @@ public sealed class Store
 
     public PayPeriod? GetPayPeriodFor(DateTime moment)
     {
-        return _db.Query("""
+        // After importing from the old software there can be two periods covering one day:
+        // one created by PunchPoint before the import and one that arrived with it. The one
+        // that matches the current anchor is the real period.
+        var candidates = _db.Query("""
             SELECT * FROM pay_periods
             WHERE start_date <= $d AND end_date >= $d
-            ORDER BY start_date DESC LIMIT 1;
-            """, MapPeriod, ("$d", FormatDate(moment))).FirstOrDefault();
+            ORDER BY start_date DESC;
+            """, MapPeriod, ("$d", FormatDate(moment)));
+
+        if (candidates.Count <= 1) return candidates.FirstOrDefault();
+
+        var settings = GetSettings();
+        return candidates.FirstOrDefault(p => TimeCalc.PayPeriodGenerator.IsAligned(p.Start, settings))
+               ?? candidates[0];
     }
 
     public PayPeriod? GetCurrentPayPeriod(DateTime? now = null)

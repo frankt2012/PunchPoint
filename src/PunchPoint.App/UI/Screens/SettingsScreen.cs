@@ -17,6 +17,13 @@ public sealed class SettingsScreen : ScreenBase
     private readonly ComboBox _periodType = Theme.Dropdown(200);
     private readonly DateTimePicker _anchor = Theme.Date(140);
     private readonly NumericUpDown _splitDay = Number(1, 28, 0, 80);
+    private readonly Label _periodPreview = new()
+    {
+        AutoSize = true,
+        Font = Theme.SmallBold,
+        ForeColor = Theme.Primary,
+        Margin = new Padding(0, 4, 0, 0),
+    };
 
     private readonly NumericUpDown _rounding = Number(0, 60, 0, 80);
     private readonly ComboBox _roundIn = Theme.Dropdown(170);
@@ -175,7 +182,20 @@ public sealed class SettingsScreen : ScreenBase
         stack.Add(SectionTitle("Pay periods"));
         stack.Add(Row("Period length", _periodType));
         stack.Add(Row("A period starts on", _anchor));
+        stack.Add(_periodPreview);
+        stack.Add(new Label
+        {
+            Text = "Any date inside a period works — for weekly periods the weekday of this date is " +
+                   "the first day of every period (a Wednesday here means Wednesday to Tuesday).",
+            Font = Theme.Small,
+            ForeColor = Theme.TextMuted,
+            AutoSize = true,
+            MaximumSize = new Size(760, 0),
+        });
         stack.Add(Row("Semi-monthly split day", _splitDay));
+
+        _anchor.ValueChanged += (_, _) => UpdatePeriodPreview();
+        _periodType.SelectedIndexChanged += (_, _) => UpdatePeriodPreview();
 
         var generate = Theme.SecondaryButton("Create periods for 1 year back and forward", 330);
         generate.Click += (_, _) => GeneratePeriods();
@@ -613,6 +633,7 @@ public sealed class SettingsScreen : ScreenBase
         _periodType.SelectedIndex = (int)s.PeriodType;
         _anchor.Value = s.PeriodAnchor;
         _splitDay.Value = s.SemiMonthlySplitDay;
+        UpdatePeriodPreview();
 
         _rounding.Value = s.RoundingMinutes;
         _roundIn.SelectedIndex = s.RoundingMinutes == 0 ? 0 : (int)s.RoundInMode;
@@ -724,6 +745,45 @@ public sealed class SettingsScreen : ScreenBase
         LoadHolidays();
     }
 
+    /// <summary>Shows which period today belongs to with the settings currently on screen.</summary>
+    private void UpdatePeriodPreview()
+    {
+        try
+        {
+            var probe = Services.Store.GetSettings();
+            probe.PeriodType = (PayPeriodType)Math.Max(0, _periodType.SelectedIndex);
+            probe.PeriodAnchor = _anchor.Value.Date;
+            probe.SemiMonthlySplitDay = (int)_splitDay.Value;
+            probe.MonthlyStartDay = (int)_splitDay.Value;
+
+            var today = DateTime.Today;
+            var current = PayPeriodGenerator.EnsureRange(probe, today, today)
+                .FirstOrDefault(p => p.Start.Date <= today && p.End.Date >= today);
+
+            if (current is null)
+            {
+                _periodPreview.Text = "No period contains today with these settings.";
+                return;
+            }
+
+            string repeat = probe.PeriodType switch
+            {
+                PayPeriodType.Weekly => "new period every week",
+                PayPeriodType.BiWeekly => "new period every two weeks",
+                PayPeriodType.SemiMonthly => "two periods a month",
+                PayPeriodType.Monthly => "one period a month",
+                _ => "",
+            };
+
+            _periodPreview.Text =
+                $"Today ({today:ddd MMM d}) is in {current.Start:ddd MMM d} – {current.End:ddd MMM d, yyyy} · {repeat}";
+        }
+        catch
+        {
+            _periodPreview.Text = "";
+        }
+    }
+
     private void ChangeSupervisorPassword()
     {
         string? hash = AdminPassword.Change(this, Services.Settings.AdminPasswordHash);
@@ -743,6 +803,8 @@ public sealed class SettingsScreen : ScreenBase
     {
         var s = Services.Store.GetSettings();
         var previousTheme = s.Theme;
+        var previousAnchor = s.PeriodAnchor;
+        var previousType = s.PeriodType;
 
         s.CompanyName = _company.Text.Trim();
         s.CompanyMessage = _message.Text.Trim();
@@ -788,6 +850,14 @@ public sealed class SettingsScreen : ScreenBase
         s.RequireApprovalBeforeExport = _requireApproval.Checked;
 
         Services.Store.SaveSettings(s);
+
+        // A different start date or period length means a different grid; rebuild it so the
+        // current period is the right one straight away.
+        if (s.PeriodAnchor.Date != previousAnchor.Date || s.PeriodType != previousType)
+        {
+            PunchPoint.Core.Storage.Maintenance.RealignPeriods(Services.Store);
+            Services.Store.Audit("Pay periods realigned", $"{s.PeriodType}, starts {s.PeriodAnchor:yyyy-MM-dd}");
+        }
         TrySetAutoStart(_startWithWindows.Checked);
         Services.Store.Audit("Settings saved", s.CompanyName);
         Services.NotifyDataChanged();

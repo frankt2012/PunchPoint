@@ -59,6 +59,39 @@ public static class PayPeriodGenerator
     }
 
     /// <summary>
+    /// True when <paramref name="start"/> belongs to the grid the current settings describe —
+    /// i.e. a weekly period that begins on the same weekday as the anchor, a monthly one that
+    /// begins on the 1st, and so on. Periods left over from an earlier anchor are not aligned.
+    /// </summary>
+    public static bool IsAligned(DateTime start, AppSettings settings)
+    {
+        start = start.Date;
+        var anchor = settings.PeriodAnchor.Date;
+
+        switch (settings.PeriodType)
+        {
+            case PayPeriodType.Weekly:
+                return DaysFrom(anchor, start) % 7 == 0;
+            case PayPeriodType.BiWeekly:
+                return DaysFrom(anchor, start) % 14 == 0;
+            case PayPeriodType.SemiMonthly:
+                return start.Day == 1 ||
+                       start.Day == Math.Min(settings.SemiMonthlySplitDay, DateTime.DaysInMonth(start.Year, start.Month));
+            case PayPeriodType.Monthly:
+                return start.Day == 1;
+            default:
+                return DaysFrom(anchor, start) % 7 == 0;
+        }
+    }
+
+    /// <summary>Whole days between two dates, always positive (2026-11-04 before 2026-11-11 is 7).</summary>
+    private static int DaysFrom(DateTime anchor, DateTime start)
+    {
+        int days = (int)(start.Date - anchor.Date).TotalDays;
+        return Math.Abs(days);
+    }
+
+    /// <summary>
     /// Generates every period needed to cover <paramref name="from"/>..<paramref name="to"/>,
     /// starting from the settings anchor. Existing periods are returned unchanged.
     /// </summary>

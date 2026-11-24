@@ -454,15 +454,6 @@ public sealed class TimeQPlusImporter
 
                 foreach (var generated in TimeCalc.PayPeriodGenerator.EnsureRange(settingsNow, min, max))
                     store.UpsertPayPeriod(generated);
-
-                store.Db.Execute("""
-                    UPDATE punches SET pay_period_id = (
-                        SELECT id FROM pay_periods
-                        WHERE start_date <= date(punches.timestamp)
-                          AND end_date   >= date(punches.timestamp)
-                        ORDER BY start_date DESC LIMIT 1)
-                    WHERE pay_period_id IS NULL;
-                    """);
             }
 
             // --- settings -----------------------------------------------
@@ -527,6 +518,11 @@ public sealed class TimeQPlusImporter
         });
 
         result.Duration = DateTime.UtcNow - started;
+        // One pass at the end, now that the imported anchor is saved: point every punch at the
+        // period that matches it. Periods left over from before the import stay in place but no
+        // longer win the "current period" lookup.
+        Storage.Maintenance.RealignPeriods(store);
+
         return result;
     }
 

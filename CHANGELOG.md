@@ -3,6 +3,22 @@
 What changed in each release, in plain language. Update checks read the newest **published**
 release, so a version stays a draft here until it has been tested on Windows.
 
+## 1.6.4 — 2026-11-24
+
+**Fix: pay periods could be off by a day after an import.** If a Wednesday-to-Tuesday shop
+imported its history, the app had already created a few periods of its own (anchored on the day
+it was installed), and both grids then covered the same dates. The lookup took the latest start,
+so the current period could begin a day late — and the punch list could be split between two
+periods.
+
+- **The period that matches your settings always wins**, and punches are re-pointed to it, even
+  when leftover periods exist. Nothing is deleted: an approved time card is never disturbed.
+- **Settings shows where today falls.** Under *A period starts on* there is now a line such as
+  *"Today (Tue Nov 24) is in Wed Nov 18 – Tue Nov 24, 2026 · new period every week"*, so the
+  anchor date no longer has to be interpreted in your head.
+- Changing the start date or period length rebuilds the grid immediately, without a restart.
+- Existing databases repair themselves the first time 1.6.4 starts.
+
 ## 1.6.3 — 2026-11-24
 
 **Maintenance release.** Two fixes found while preparing the project screenshots.
