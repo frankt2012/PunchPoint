@@ -237,6 +237,8 @@ public sealed class SetupForm : Form
             SetStatus("Unpacking PunchPoint…", 10);
             ExtractPayload(target);
 
+            VerifyInstalledVersion(target);
+
             SetStatus("Creating shortcuts…", 60);
             CreateShortcuts(target);
             RefreshShellIcons();
@@ -250,7 +252,7 @@ public sealed class SetupForm : Form
 
             SetStatus("Installed.", 100);
 
-            string message = "PunchPoint is installed.\r\n\r\n" +
+            string message = $"PunchPoint {Application.ProductVersion.Split('+')[0]} is installed.\r\n\r\n" +
                              "The first time you start it you will create the supervisor password.\r\n" +
                              "Your existing data folder was left untouched.";
 
@@ -303,6 +305,27 @@ public sealed class SetupForm : Form
                 try { process.CloseMainWindow(); process.WaitForExit(2000); } catch { }
                 try { if (!process.HasExited) process.Kill(); } catch { }
             }
+        }
+    }
+
+    /// <summary>
+    /// Confirms the program on disk is the version this setup carries. A file left behind (for
+    /// example a copy that was in use) would otherwise make an upgrade look successful while the
+    /// old version keeps running.
+    /// </summary>
+    private void VerifyInstalledVersion(string target)
+    {
+        string exe = Path.Combine(target, "PunchPoint.exe");
+        if (!File.Exists(exe)) return;
+
+        string expected = Application.ProductVersion.Split('+')[0];
+        string actual = System.Diagnostics.FileVersionInfo.GetVersionInfo(exe).ProductVersion ?? "";
+
+        if (!actual.StartsWith(expected, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"The installed program reports version {actual}, but this setup is {expected}. " +
+                "Close PunchPoint and run the setup again.");
         }
     }
 

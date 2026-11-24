@@ -3,7 +3,7 @@
 What changed in each release, in plain language. Update checks read the newest **published**
 release, so a version stays a draft here until it has been tested on Windows.
 
-## 1.6.0 — 2026-11-24
+## 1.6.1 — 2026-11-24
 
 **Feature release.** Fills the gaps around missing punches, punctuality and backups, and makes
 the clock's exit password optional.
