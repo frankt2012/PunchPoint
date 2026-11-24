@@ -135,6 +135,7 @@ internal sealed class ScreenTour
                 foreach (var (scroll, name) in new (Action, string)[]
                          {
                              (settings.ScrollToEmailCard, "15-windowed-settings-email"),
+                             (settings.ScrollToUpdatesCard, "16-windowed-settings-updates"),
                          })
                 {
                     scroll();
@@ -156,9 +157,9 @@ internal sealed class ScreenTour
             using (var bitmap = new Bitmap(dialog.Width, dialog.Height))
             {
                 dialog.DrawToBitmap(bitmap, new Rectangle(0, 0, dialog.Width, dialog.Height));
-                bitmap.Save(Path.Combine(_folder, "16-add-employee.png"), ImageFormat.Png);
+                bitmap.Save(Path.Combine(_folder, "17-add-employee.png"), ImageFormat.Png);
             }
-            _report.AppendLine("16-add-employee: captured");
+            _report.AppendLine("17-add-employee: captured");
             dialog.Close();
         }
         catch (Exception ex)

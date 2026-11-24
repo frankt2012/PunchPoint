@@ -49,6 +49,7 @@ public sealed class SettingsScreen : ScreenBase
     private readonly TextBox _updateRepo = Theme.Input(340);
     private readonly Label _updateStatus = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted, MaximumSize = new Size(780, 0) };
     private Button _checkNow = null!;
+    private readonly Panel _updatesCard;
     private readonly Panel _emailCard;
     private readonly DataGridView _shifts = new();
     private readonly DataGridView _holidays = new();
@@ -70,7 +71,7 @@ public sealed class SettingsScreen : ScreenBase
         stack.Add(BuildShiftCard());
         stack.Add(BuildHolidayCard());
         stack.Add(_emailCard = BuildEmailCard());
-        stack.Add(BuildUpdatesCard());
+        stack.Add(_updatesCard = BuildUpdatesCard());
         stack.Add(BuildDataCard());
 
         _periodType.Items.AddRange(new object[] { "Weekly", "Bi-weekly", "Semi-monthly", "Monthly" });
@@ -271,6 +272,9 @@ public sealed class SettingsScreen : ScreenBase
         card.Controls.Add(stack);
         return card;
     }
+
+    /// <summary>Diagnostics: bring the updates card into view for a screenshot.</summary>
+    public void ScrollToUpdatesCard() => RevealCard(_updatesCard);
 
     /// <summary>Diagnostics: bring the email card into view for a screenshot.</summary>
     public void ScrollToEmailCard() => RevealCard(_emailCard);
