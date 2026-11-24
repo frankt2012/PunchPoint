@@ -3,6 +3,16 @@
 What changed in each release, in plain language. Update checks read the newest **published**
 release, so a version stays a draft here until it has been tested on Windows.
 
+## 1.6.3 — 2026-11-24
+
+**Maintenance release.** Two fixes found while preparing the project screenshots.
+
+- **Report tables show their content.** Columns size to what is in them, so dates read
+  `11/23/2026` instead of `11/2…`, and times are readable; a long report scrolls rather than
+  squeezing every column.
+- **The dashboard no longer opens with its first row highlighted**, which looked like a
+  selection and could be mistaken for data.
+
 ## 1.6.2 — 2026-11-24
 
 **Feature release.** Punctuality reporting, a visible activity history and automatic backups
