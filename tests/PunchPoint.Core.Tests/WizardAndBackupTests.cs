@@ -99,19 +99,19 @@ public class AttendanceReportTests
             store.InsertEmployee(employee);
 
             // Mon 23rd: 20 minutes late, left on time.
-            store.InsertPunch(new Punch { EmployeeId = employee.Id, Timestamp = new DateTime(2026, 11, 23, 8, 20, 0), Kind = PunchKind.In });
-            store.InsertPunch(new Punch { EmployeeId = employee.Id, Timestamp = new DateTime(2026, 11, 23, 17, 0, 0), Kind = PunchKind.Out });
+            store.InsertPunch(new Punch { EmployeeId = employee.Id, Timestamp = new DateTime(2026, 11, 16, 8, 20, 0), Kind = PunchKind.In });
+            store.InsertPunch(new Punch { EmployeeId = employee.Id, Timestamp = new DateTime(2026, 11, 16, 17, 0, 0), Kind = PunchKind.Out });
             // Tue 24th: on time, left 30 minutes early.
-            store.InsertPunch(new Punch { EmployeeId = employee.Id, Timestamp = new DateTime(2026, 11, 24, 7, 58, 0), Kind = PunchKind.In });
-            store.InsertPunch(new Punch { EmployeeId = employee.Id, Timestamp = new DateTime(2026, 11, 24, 16, 30, 0), Kind = PunchKind.Out });
+            store.InsertPunch(new Punch { EmployeeId = employee.Id, Timestamp = new DateTime(2026, 11, 17, 7, 58, 0), Kind = PunchKind.In });
+            store.InsertPunch(new Punch { EmployeeId = employee.Id, Timestamp = new DateTime(2026, 11, 17, 16, 30, 0), Kind = PunchKind.Out });
             // Wed 25th: nothing (absent).
             // Thu 26th: a paid holiday, skipped.
-            store.SaveHoliday(new Holiday { Name = "Thanksgiving", Date = new DateTime(2026, 11, 26) });
+            store.SaveHoliday(new Holiday { Name = "Holiday", Date = new DateTime(2026, 11, 19) });
 
             var period = new PayPeriod
             {
-                Start = new DateTime(2026, 11, 23),
-                End = new DateTime(2026, 11, 27),
+                Start = new DateTime(2026, 11, 16),
+                End = new DateTime(2026, 11, 20),
                 Type = PayPeriodType.Weekly,
             };
             store.UpsertPayPeriod(period);
@@ -262,6 +262,45 @@ public class ClockExitSettingTests
             Assert.False(reloaded.RequirePasswordToCloseClock);
             Assert.Equal(30, reloaded.BackupRetention);
             Assert.Equal(@"C:\Users\frank\Google Drive\PunchPoint", reloaded.BackupMirrorFolder);
+        }
+        finally
+        {
+            foreach (string suffix in new[] { "", "-wal", "-shm" })
+            {
+                try { File.Delete(path + suffix); } catch { }
+            }
+        }
+    }
+}
+
+public class AttendanceFutureDaysTests
+{
+    [Fact]
+    public void Days_that_have_not_happened_yet_are_not_absences()
+    {
+        string path = TestPaths.NewDatabasePath();
+        try
+        {
+            using var database = Database.Open(path);
+            var store = new Store(database);
+
+            var employee = new Employee { FirstName = "Future", LastName = "Person", Pin = "9" };
+            store.InsertEmployee(employee);
+
+            // A period entirely in the future: no work days should be counted at all.
+            var period = new PayPeriod
+            {
+                Start = DateTime.Today.AddDays(60),
+                End = DateTime.Today.AddDays(66),
+                Type = PayPeriodType.Weekly,
+            };
+            store.UpsertPayPeriod(period);
+
+            var table = ReportBuilder.Attendance(store, period, store.GetSettings(), new[] { employee });
+
+            var row = table.Rows[0];
+            Assert.Equal("0", row[2]); // work days
+            Assert.Equal("0", row[7]); // absent
         }
         finally
         {

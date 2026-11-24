@@ -31,6 +31,7 @@ public static class Program
                 "doctor" => Doctor(args[1..]),
                 "pdf" => Pdf(args[1..]),
                 "update" => Update(args[1..]),
+                "report" => Report(args[1..]),
                 "help" or "-h" or "--help" => Usage(),
                 _ => Unknown(args[0]),
             };
@@ -70,6 +71,10 @@ public static class Program
                 --no-settings           Do not copy company rules
                 --misc-hours            Import transactions that carry hours (vacation etc.)
                 --reset                 Delete the target database first
+
+            Reports
+              punchpoint report [name] [--db <file>] [--period <n>]   Print a report as text
+              Names: attendance, hours, approvals
 
             Updates
               punchpoint update [--repo owner/name] [--current x.y.z]
@@ -406,6 +411,66 @@ public static class Program
 
     private static string Fmt(int minutes) => (minutes / 60.0).ToString("0.00");
 
+    private static int Report(string[] args)
+    {
+        string name = args.Length > 0 && !args[0].StartsWith("--") ? args[0] : "attendance";
+        string? dbPath = null;
+        int? periodId = null;
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--db": dbPath = args[++i]; break;
+                case "--period": periodId = int.Parse(args[++i]); break;
+            }
+        }
+
+        using var database = dbPath is null ? Database.OpenDefault() : Database.Open(dbPath);
+        var store = new Store(database);
+        var settings = store.GetSettings();
+        var period = periodId is int id ? store.GetPayPeriod(id) : store.GetCurrentPayPeriod();
+        if (period is null)
+        {
+            Console.Error.WriteLine("No pay period found.");
+            return 1;
+        }
+
+        var employees = store.ListEmployees(includeInactive: true);
+        var table = name.ToLowerInvariant() switch
+        {
+            "hours" => PunchPoint.Core.Reports.ReportBuilder.HoursSummary(store, period, settings, employees),
+            "approvals" => PunchPoint.Core.Reports.ReportBuilder.Unapproved(store, period, settings, employees),
+            _ => PunchPoint.Core.Reports.ReportBuilder.Attendance(store, period, settings, employees),
+        };
+
+        Console.WriteLine($"{table.Title} — {table.Subtitle}");
+        Console.WriteLine();
+
+        var widths = new int[table.Columns.Count];
+        for (int c = 0; c < table.Columns.Count; c++)
+        {
+            widths[c] = table.Columns[c].Length;
+            foreach (var row in table.Rows)
+                if (c < row.Count) widths[c] = Math.Max(widths[c], row[c].Length);
+        }
+
+        void Line(IReadOnlyList<string> cells)
+        {
+            for (int c = 0; c < table.Columns.Count; c++)
+            {
+                string cell = c < cells.Count ? cells[c] : "";
+                Console.Write(cell.PadRight(widths[c] + 2));
+            }
+            Console.WriteLine();
+        }
+
+        Line(table.Columns);
+        Line(widths.Select(w => new string('-', w)).ToArray());
+        foreach (var row in table.Rows) Line(row);
+        return 0;
+    }
+
     private static int Update(string[] args)
     {
         string? repo = null;
@@ -469,6 +534,38 @@ public static class Program
         return 0;
     }
 
+    /// <summary>
+    /// A realistic day up to 2pm: two people finished, one is still on the clock, one has no
+    /// clock-out (so the missing-punch wizard has something to find).
+    /// </summary>
+    private static (PunchKind Kind, TimeSpan Time)[] TodayFor(string pin) => pin switch
+    {
+        "1001" => new[]
+        {
+            (PunchKind.In, new TimeSpan(7, 58, 0)),
+            (PunchKind.BreakOut, new TimeSpan(12, 1, 0)),
+            (PunchKind.BreakIn, new TimeSpan(12, 29, 0)),
+            (PunchKind.Out, new TimeSpan(13, 55, 0)),
+        },
+        "1002" => new[]
+        {
+            (PunchKind.In, new TimeSpan(8, 3, 0)),
+            (PunchKind.BreakOut, new TimeSpan(12, 0, 0)),
+            (PunchKind.BreakIn, new TimeSpan(12, 31, 0)),
+            (PunchKind.Out, new TimeSpan(14, 0, 0)),
+        },
+        "1003" => new[]
+        {
+            (PunchKind.In, new TimeSpan(9, 10, 0)),
+        },
+        _ => new[]
+        {
+            (PunchKind.In, new TimeSpan(8, 22, 0)),
+            (PunchKind.BreakOut, new TimeSpan(12, 5, 0)),
+            (PunchKind.BreakIn, new TimeSpan(12, 35, 0)),
+        },
+    };
+
     private static int Doctor(string[] args)
     {
         string? dbPath = null;
@@ -490,8 +587,12 @@ public static class Program
     private static int Demo(string[] args)
     {
         string? dbPath = null;
+        bool todayOnly = false;
         for (int i = 0; i < args.Length; i++)
+        {
             if (args[i] == "--db") dbPath = args[++i];
+            if (args[i] == "--today") todayOnly = true;
+        }
 
         using var database = dbPath is null ? Database.OpenDefault() : Database.Open(dbPath);
         var store = new Store(database);
@@ -540,6 +641,13 @@ public static class Program
                 Notes = note,
             };
             store.InsertEmployee(employee);
+
+            if (todayOnly)
+            {
+                foreach (var (kind, time) in TodayFor(pin))
+                    clock.Punch(employee, kind, DateTime.Today.Add(time), source: PunchSource.Clock);
+                continue;
+            }
 
             for (int d = 9; d >= 0; d--)
             {

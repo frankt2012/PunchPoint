@@ -154,6 +154,8 @@ public static class ReportBuilder
             table.AddColumn(column);
 
         var holidays = store.ListHolidays().Select(h => h.Date.Date).ToHashSet();
+        // Days still to come are not absences: only count the part of the period that has happened.
+        var lastDay = period.End.Date < DateTime.Today ? period.End.Date : DateTime.Today;
         var defaultShift = new Shift { Name = "08:00–17:00", Start = new TimeSpan(8, 0, 0), Stop = new TimeSpan(17, 0, 0) };
 
         int totalWorkDays = 0, totalLate = 0, totalLateMinutes = 0,
@@ -172,7 +174,7 @@ public static class ReportBuilder
 
             int workDays = 0, late = 0, lateMinutes = 0, early = 0, earlyMinutes = 0, absent = 0;
 
-            for (var day = period.Start.Date; day <= period.End.Date; day = day.AddDays(1))
+            for (var day = period.Start.Date; day <= lastDay; day = day.AddDays(1))
             {
                 if (day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) continue;
                 if (holidays.Contains(day)) continue;

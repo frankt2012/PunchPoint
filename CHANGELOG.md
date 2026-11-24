@@ -27,8 +27,11 @@ the clock's exit password optional.
 
 ### Notes
 
+- The attendance report only counts days that have happened: weekdays still to come in the
+  current period are not treated as absences.
 - Database schema is version 11; existing data is migrated automatically and nothing is
-  removed.
+  removed. The diagnostic CLI gained `report attendance|hours|approvals` and
+  `demo --today` for repeatable checks.
 - Backups stay ordinary SQLite files, so the copies in your cloud folder are readable by the
   same version of PunchPoint (or any SQLite tool).
 
