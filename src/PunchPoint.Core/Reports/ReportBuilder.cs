@@ -132,6 +132,105 @@ public static class ReportBuilder
         return table;
     }
 
+    /// <summary>
+    /// Punctuality per employee: work days, days late, minutes late, early departures and days
+    /// with no punches at all. Uses each employee's assigned shift; anyone without one is
+    /// measured against 08:00–17:00 and marked in the Shift column.
+    /// </summary>
+    public static ReportTable Attendance(Store store, PayPeriod period, AppSettings settings,
+        IReadOnlyList<Employee> employees)
+    {
+        var table = new ReportTable
+        {
+            Title = "Attendance",
+            Subtitle = $"{period.Start:MMM d} – {period.End:MMM d, yyyy}",
+        };
+
+        foreach (string column in new[]
+                 {
+                     "Employee", "Shift", "Work days", "Late", "Late time",
+                     "Left early", "Left early time", "Absent",
+                 })
+            table.AddColumn(column);
+
+        var holidays = store.ListHolidays().Select(h => h.Date.Date).ToHashSet();
+        var defaultShift = new Shift { Name = "08:00–17:00", Start = new TimeSpan(8, 0, 0), Stop = new TimeSpan(17, 0, 0) };
+
+        int totalWorkDays = 0, totalLate = 0, totalLateMinutes = 0,
+            totalEarly = 0, totalEarlyMinutes = 0, totalAbsent = 0;
+
+        foreach (var employee in employees.OrderBy(e => e.SortName))
+        {
+            var shift = (employee.ShiftId is int id ? store.GetShift(id) : null) ?? defaultShift;
+            bool hasShift = employee.ShiftId is not null;
+
+            var punches = store.ListPunches(employee.Id, period.Start, period.End.AddDays(1));
+            var byDay = punches
+                .Where(p => p.Kind is PunchKind.In or PunchKind.Out)
+                .GroupBy(p => TimeCardCalculator.WorkDate(p.Timestamp, settings.DayChangeOffsetMinutes))
+                .ToDictionary(g => g.Key, g => g.OrderBy(p => p.Timestamp).ToList());
+
+            int workDays = 0, late = 0, lateMinutes = 0, early = 0, earlyMinutes = 0, absent = 0;
+
+            for (var day = period.Start.Date; day <= period.End.Date; day = day.AddDays(1))
+            {
+                if (day.DayOfWeek is DayOfWeek.Saturday or DayOfWeek.Sunday) continue;
+                if (holidays.Contains(day)) continue;
+                if (employee.HireDate is DateTime hired && day < hired.Date) continue;
+
+                workDays++;
+
+                if (!byDay.TryGetValue(day, out var dayPunches) || dayPunches.Count == 0)
+                {
+                    absent++;
+                    continue;
+                }
+
+                var firstIn = dayPunches.FirstOrDefault(p => p.Kind == PunchKind.In)?.Timestamp;
+                var lastOut = dayPunches.LastOrDefault(p => p.Kind == PunchKind.Out)?.Timestamp;
+
+                var expectedStart = day.Add(shift.Start).AddMinutes(shift.StartGraceMinutes);
+                var expectedStop = day.Add(shift.Stop).AddMinutes(-shift.StopGraceMinutes);
+                if (shift.Stop <= shift.Start) expectedStop = expectedStop.AddDays(1);
+
+                if (firstIn is DateTime clockIn && clockIn > expectedStart)
+                {
+                    late++;
+                    lateMinutes += (int)(clockIn - expectedStart).TotalMinutes;
+                }
+
+                if (lastOut is DateTime clockOut && clockOut < expectedStop)
+                {
+                    early++;
+                    earlyMinutes += (int)(expectedStop - clockOut).TotalMinutes;
+                }
+            }
+
+            totalWorkDays += workDays;
+            totalLate += late;
+            totalLateMinutes += lateMinutes;
+            totalEarly += early;
+            totalEarlyMinutes += earlyMinutes;
+            totalAbsent += absent;
+
+            table.AddRow(
+                employee.SortName,
+                hasShift ? shift.Name : shift.Name + " (default)",
+                workDays.ToString(),
+                late.ToString(),
+                late == 0 ? "" : Hours(lateMinutes, settings.TotalsFormat),
+                early.ToString(),
+                early == 0 ? "" : Hours(earlyMinutes, settings.TotalsFormat),
+                absent.ToString());
+        }
+
+        table.AddRow("TOTAL", "", totalWorkDays.ToString(), totalLate.ToString(),
+            Hours(totalLateMinutes, settings.TotalsFormat), totalEarly.ToString(),
+            Hours(totalEarlyMinutes, settings.TotalsFormat), totalAbsent.ToString());
+
+        return table;
+    }
+
     public static ReportTable DailyTotals(Store store, PayPeriod period, AppSettings settings,
         IReadOnlyList<Employee> employees, bool byEmployee)
     {

@@ -535,7 +535,19 @@ public sealed class KioskForm : Form
 
     private void SupervisorExit()
     {
-        string? hash = _store.GetSettings().AdminPasswordHash;
+        var settings = _store.GetSettings();
+        string? hash = settings.AdminPasswordHash;
+
+        // Some sites do not want a password on the clock (a PC the supervisor keeps an eye on).
+        if (!settings.RequirePasswordToCloseClock)
+        {
+            if (!PromptDialog.Confirm(this, "Close the employee clock?"))
+                return;
+
+            _allowClose = true;
+            Close();
+            return;
+        }
 
         if (string.IsNullOrWhiteSpace(hash))
         {

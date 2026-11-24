@@ -113,6 +113,17 @@ public sealed class AppSettings
     /// <summary>A version the user asked not to be reminded about.</summary>
     public string SkippedUpdateVersion { get; set; } = "";
 
+    // ---- clock exit ----
+    /// <summary>Ask for the supervisor password before the clock can be closed.</summary>
+    public bool RequirePasswordToCloseClock { get; set; } = true;
+
+    // ---- backups ----
+    /// <summary>How many dated backups to keep; 0 keeps them all.</summary>
+    public int BackupRetention { get; set; } = 14;
+
+    /// <summary>Optional folder that receives a copy of every backup (a synced cloud folder).</summary>
+    public string BackupMirrorFolder { get; set; } = "";
+
     public string LastBackupPath { get; set; } = "";
     public int SchemaVersion { get; set; } = 1;
 }

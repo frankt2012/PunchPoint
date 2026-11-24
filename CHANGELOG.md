@@ -3,6 +3,35 @@
 What changed in each release, in plain language. Update checks read the newest **published**
 release, so a version stays a draft here until it has been tested on Windows.
 
+## 1.6.0 — 2026-11-24
+
+**Feature release.** Fills the gaps around missing punches, punctuality and backups, and makes
+the clock's exit password optional.
+
+### What's new
+
+- **Fix missing punches.** Punch Editing has a **Fix missing…** button. It lists every day with
+  an unmatched clock-in or clock-out, suggests a time for the missing punch (the shift's start
+  or stop), and adds the ones you tick — with one entry in the activity log.
+- **Attendance report.** A new report shows, per employee: work days, days late, total minutes
+  late, early departures, and days with no punches at all. Weekends and holidays are skipped;
+  employees without a shift are measured against 08:00–17:00 and marked as such.
+- **Activity log.** Settings → Your data → **Activity log…** shows the last 500 recorded
+  changes: imports, punch edits, approvals, settings, backups — with the user and the time.
+- **Backups on autopilot.** One backup is taken each day automatically (whichever program runs
+  first), the newest **N** are kept (default 14), and an optional **copy folder** receives every
+  backup. Point that folder at Google Drive, OneDrive, Dropbox or a network share and the cloud
+  app does the rest — no accounts or tokens in PunchPoint.
+- **The clock's exit password is now optional.** Settings → Company → *Closing the clock needs
+  the supervisor password* can be switched off; closing then asks only for a confirmation.
+
+### Notes
+
+- Database schema is version 11; existing data is migrated automatically and nothing is
+  removed.
+- Backups stay ordinary SQLite files, so the copies in your cloud folder are readable by the
+  same version of PunchPoint (or any SQLite tool).
+
 ## 1.5.3 — 2026-11-24
 
 **Appearance and reliability update.** The dark theme keeps the card shading from the design

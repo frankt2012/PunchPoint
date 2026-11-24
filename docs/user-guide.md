@@ -165,6 +165,38 @@ your inbox (and optionally in each employee's).
 If you later want a live view from home, the safe way to add it is a private mesh such as
 Tailscale — no ports opened, encrypted end to end.
 
+## Missing punches
+
+Punch Editing → **Fix missing…** finds the days where a clock-in has no clock-out (or the other
+way round) and proposes a time — the shift's start or stop, or eight hours from the punch that
+exists. Untick anything that is wrong, then **Add selected punches**. Each fix is recorded in
+the activity log.
+
+## Attendance
+
+Reports → **Attendance** shows punctuality for the period: work days, days late, how many
+minutes late in total, early departures and days with no punches. Weekends and paid holidays
+are skipped. Employees without an assigned shift are measured against 08:00–17:00.
+
+## Backups
+
+Settings → Your data:
+
+* **Keep the last N backups** — older ones are removed automatically (default 14).
+* **Copy backups to** — pick a folder inside Google Drive, OneDrive or Dropbox (or a network
+  share). Every backup is copied there too; the cloud client uploads it. No account details are
+  stored in PunchPoint.
+* **Activity log…** — who changed what, and when.
+
+A backup is taken automatically once a day by whichever program (clock or admin app) starts
+first. **Back up now** still works at any time.
+
+## The clock's exit password
+
+Settings → Company → **Closing the clock needs the supervisor password**. When it is on,
+Ctrl+Shift+E or the Supervisor button asks for the password. When it is off, closing asks only
+for a confirmation — useful when the supervisor is the one using that PC.
+
 ## Updates
 
 Settings → **Updates** shows the version you are running. Once a day, when PunchPoint opens, it

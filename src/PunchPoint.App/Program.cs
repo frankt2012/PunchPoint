@@ -105,7 +105,13 @@ internal static class Program
                 try
                 {
                     using var mailDb = Database.Open(dbPathForMail);
-                    Core.Email.PeriodMailer.RunIfDue(new Store(mailDb));
+                    var mailStore = new Store(mailDb);
+
+                    // One backup a day, with retention and the optional cloud-folder copy.
+                    Core.Storage.BackupService.EnsureDailyBackup(
+                        mailStore, mailStore.GetSettings(), DateTime.Now);
+
+                    Core.Email.PeriodMailer.RunIfDue(mailStore);
                 }
                 catch
                 {

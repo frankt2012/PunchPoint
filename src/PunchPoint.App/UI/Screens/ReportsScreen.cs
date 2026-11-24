@@ -19,6 +19,7 @@ public sealed class ReportsScreen : ScreenBase
         ("Hours Summary", "Regular, overtime and holiday hours per employee"),
         ("Daily Totals By Day", "Every employee's totals, grouped by date"),
         ("Daily Totals By Employee", "Every employee's totals, grouped by employee"),
+        ("Attendance", "Late arrivals, early outs and absences per employee"),
         ("Raw Transactions", "Every punch exactly as recorded"),
         ("Time Card Approvals", "Time cards still waiting for approval"),
         ("Employee Profiles", "Names, PINs, badges, shifts and status"),
@@ -163,6 +164,8 @@ public sealed class ReportsScreen : ScreenBase
                 : ReportBuilder.DailyTotals(store, period, settings, _employees, byEmployee: false),
             "Daily Totals By Employee" => period is null ? null
                 : ReportBuilder.DailyTotals(store, period, settings, _employees, byEmployee: true),
+            "Attendance" => period is null ? null
+                : ReportBuilder.Attendance(store, period, settings, _employees),
             "Raw Transactions" => period is null ? null
                 : ReportBuilder.RawTransactions(store, period),
             "Time Card Approvals" => period is null ? null

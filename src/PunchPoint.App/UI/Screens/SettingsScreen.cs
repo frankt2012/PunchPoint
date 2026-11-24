@@ -34,6 +34,9 @@ public sealed class SettingsScreen : ScreenBase
     private readonly CheckBox _roundDayTotal = Theme.Check("Round the day total instead of each punch");
     private readonly CheckBox _requireApproval = Theme.Check("Warn before exporting a period that is not fully approved");
     private readonly CheckBox _startWithWindows = Theme.Check("Start the clock automatically when Windows starts");
+    private readonly CheckBox _clockExitPassword = Theme.Check("Closing the clock needs the supervisor password");
+    private readonly NumericUpDown _backupRetention = Number(1, 365, 0, 80);
+    private readonly TextBox _backupMirror = Theme.Input(420);
     private readonly TextBox _smtpHost = Theme.Input(220);
     private readonly NumericUpDown _smtpPort = Number(1, 65535, 0, 80);
     private readonly CheckBox _smtpSsl = Theme.Check("Use SSL/TLS (port 465 or 587)");
@@ -117,13 +120,24 @@ public sealed class SettingsScreen : ScreenBase
         stack.Add(new Label
         {
             Text = "Windowed is right for a shared PC. Use kiosk mode only on a PC that is used for nothing " +
-                   "but clocking in; it covers the screen and cannot be closed without the supervisor password. " +
-                   "Restart the clock after changing this.",
+                   "but clocking in; it covers the screen. Restart the clock after changing this.",
             Font = Theme.Small,
             ForeColor = Theme.TextMuted,
             AutoSize = true,
             MaximumSize = new Size(760, 0),
             Margin = new Padding(0, 2, 0, 0),
+        });
+
+        _clockExitPassword.Margin = new Padding(0, 8, 0, 0);
+        stack.Add(_clockExitPassword);
+        stack.Add(new Label
+        {
+            Text = "On, Ctrl+Shift+E (or the Supervisor button) asks for the supervisor password before the " +
+                   "clock closes. Off, it only asks you to confirm — handy on a PC you look after yourself.",
+            Font = Theme.Small,
+            ForeColor = Theme.TextMuted,
+            AutoSize = true,
+            MaximumSize = new Size(760, 0),
         });
 
         var appearanceRow = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 10, 0, 0) };
@@ -475,7 +489,47 @@ public sealed class SettingsScreen : ScreenBase
         }
         stack.Add(counts);
 
-        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false };
+        var retentionRow = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 6, 0, 0) };
+        retentionRow.Controls.Add(new Label
+        {
+            Text = "Keep the last",
+            Width = 300,
+            AutoSize = false,
+            Margin = new Padding(0, 8, 8, 0),
+            ForeColor = Theme.TextMuted,
+        });
+        retentionRow.Controls.Add(_backupRetention);
+        retentionRow.Controls.Add(new Label { Text = "backups", AutoSize = true, Margin = new Padding(8, 10, 0, 0), ForeColor = Theme.TextMuted });
+        stack.Add(retentionRow);
+
+        var mirrorRow = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 4, 0, 0) };
+        mirrorRow.Controls.Add(new Label
+        {
+            Text = "Copy backups to",
+            Width = 300,
+            AutoSize = false,
+            Margin = new Padding(0, 8, 8, 0),
+            ForeColor = Theme.TextMuted,
+        });
+        mirrorRow.Controls.Add(_backupMirror);
+        var browse = Theme.SecondaryButton("Browse…", 100);
+        browse.Margin = new Padding(8, 4, 0, 0);
+        browse.Click += (_, _) => BrowseForBackupFolder();
+        mirrorRow.Controls.Add(browse);
+        stack.Add(mirrorRow);
+
+        stack.Add(new Label
+        {
+            Text = "Leave empty to keep backups only on this PC. Point it at your Google Drive, OneDrive or " +
+                   "Dropbox folder and every backup is copied there as well — no account setup needed, the " +
+                   "cloud app does the uploading.",
+            Font = Theme.Small,
+            ForeColor = Theme.TextMuted,
+            AutoSize = true,
+            MaximumSize = new Size(760, 0),
+        });
+
+        var buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 6, 0, 0) };
         var check = Theme.SecondaryButton("Check database", 140);
         check.Click += (_, _) => RunIntegrityCheck();
         buttons.Controls.Add(check);
@@ -488,6 +542,9 @@ public sealed class SettingsScreen : ScreenBase
         buttons.Controls.Add(backup);
         buttons.Controls.Add(open);
         buttons.Controls.Add(restore);
+        var activity = Theme.SecondaryButton("Activity log…", 140);
+        activity.Click += (_, _) => ShowActivityLog();
+        buttons.Controls.Add(activity);
         stack.Add(buttons);
 
         card.Controls.Add(stack);
@@ -572,6 +629,9 @@ public sealed class SettingsScreen : ScreenBase
         _roundDayTotal.Checked = s.RoundDailyTotalInsteadOfPunches;
         _requireApproval.Checked = s.RequireApprovalBeforeExport;
         _startWithWindows.Checked = IsAutoStartEnabled();
+        _clockExitPassword.Checked = s.RequirePasswordToCloseClock;
+        _backupRetention.Value = Math.Clamp(s.BackupRetention <= 0 ? 1 : s.BackupRetention, 1, 365);
+        _backupMirror.Text = s.BackupMirrorFolder;
 
         LoadShifts();
         LoadHolidays();
@@ -720,6 +780,10 @@ public sealed class SettingsScreen : ScreenBase
         s.UpdateRepo = _updateRepo.Text.Trim();
         s.SmtpPassword = SecretProtector.Protect(_smtpPassword.Text, s.EncryptSecrets);
 
+        s.RequirePasswordToCloseClock = _clockExitPassword.Checked;
+        s.BackupRetention = (int)_backupRetention.Value;
+        s.BackupMirrorFolder = _backupMirror.Text.Trim();
+
         s.ShowPunchCommentDialog = _punchComment.Checked;
         s.RequireApprovalBeforeExport = _requireApproval.Checked;
 
@@ -758,6 +822,24 @@ public sealed class SettingsScreen : ScreenBase
 
         Services.NotifyDataChanged();
         PromptDialog.Info(this, $"Created or updated {periods.Count} pay periods.");
+    }
+
+    private void BrowseForBackupFolder()
+    {
+        using var dialog = new FolderBrowserDialog
+        {
+            Description = "Choose the folder that should receive a copy of every backup",
+            SelectedPath = Directory.Exists(_backupMirror.Text) ? _backupMirror.Text : "",
+        };
+
+        if (dialog.ShowDialog(this) == DialogResult.OK)
+            _backupMirror.Text = dialog.SelectedPath;
+    }
+
+    private void ShowActivityLog()
+    {
+        using var dialog = new ActivityLogDialog(Services.Store);
+        dialog.ShowDialog(this);
     }
 
     private void RunIntegrityCheck()

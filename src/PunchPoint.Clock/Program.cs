@@ -57,6 +57,22 @@ internal static class Program
 
             store.Audit("Clock started", fullScreen ? "kiosk mode" : "windowed mode");
 
+            // The clock usually runs all day, so it takes the daily backup too.
+            _ = Task.Run(() =>
+            {
+                try
+                {
+                    using var backupDb = Database.Open(database.Path);
+                    var backupStore = new Store(backupDb);
+                    Core.Storage.BackupService.EnsureDailyBackup(
+                        backupStore, backupStore.GetSettings(), DateTime.Now);
+                }
+                catch
+                {
+                    // a failed backup must not stop the clock
+                }
+            });
+
             // The clock usually runs all day, so it is the natural place to send the
             // end-of-period summary.
             var mailTimer = new System.Windows.Forms.Timer { Interval = 30 * 60 * 1000 };

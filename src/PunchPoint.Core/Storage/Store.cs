@@ -91,6 +91,9 @@ public sealed class Store
                     ? parsed
                     : null,
             SkippedUpdateVersion = r.HasColumn("skipped_update") ? r.GetStringOrNull("skipped_update") ?? "" : "",
+            RequirePasswordToCloseClock = !r.HasColumn("clock_exit_password") || r.GetBool("clock_exit_password", true),
+            BackupRetention = r.HasColumn("backup_retention") ? r.GetInt("backup_retention", 14) : 14,
+            BackupMirrorFolder = r.HasColumn("backup_mirror") ? r.GetStringOrNull("backup_mirror") ?? "" : "",
             LastBackupPath = r.GetStringOrNull("last_backup_path") ?? "",
         });
 
@@ -123,6 +126,8 @@ public sealed class Store
                 encrypt_secrets = $encryptSecrets,
                 check_updates = $checkUpdates, update_repo = $updateRepo,
                 last_update_check = $lastCheck, skipped_update = $skippedUpdate,
+                clock_exit_password = $clockExit,
+                backup_retention = $retention, backup_mirror = $mirror,
                 last_backup_path = $backup
             WHERE id = 1;
             """,
@@ -153,6 +158,9 @@ public sealed class Store
             ("$updateRepo", s.UpdateRepo),
             ("$lastCheck", s.LastUpdateCheck is DateTime checkedAt ? Format(checkedAt) : ""),
             ("$skippedUpdate", s.SkippedUpdateVersion),
+            ("$clockExit", s.RequirePasswordToCloseClock ? 1 : 0),
+            ("$retention", s.BackupRetention),
+            ("$mirror", s.BackupMirrorFolder),
             ("$backup", s.LastBackupPath));
     }
 
@@ -677,6 +685,20 @@ public sealed class Store
     // =====================================================================
     // Audit + import log
     // =====================================================================
+
+    /// <summary>Recent audit entries, newest first, for the activity log window.</summary>
+    public List<(DateTime When, string User, string Action, string Detail)> ListAudit(int limit = 500) =>
+        _db.Query("""
+            SELECT happened_at, user, action, detail
+            FROM audit_log
+            ORDER BY id DESC
+            LIMIT $limit;
+            """,
+            r => (ParseTimestamp(r.GetStringOrNull("happened_at")),
+                  r.GetStringOrNull("user") ?? "",
+                  r.GetStringOrNull("action") ?? "",
+                  r.GetStringOrNull("detail") ?? ""),
+            ("$limit", limit));
 
     public void Audit(string action, string detail = "", string user = "")
     {
