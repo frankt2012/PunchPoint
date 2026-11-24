@@ -74,7 +74,7 @@ public static class Program
 
             Reports
               punchpoint report [name] [--db <file>] [--period <n>]   Print a report as text
-              Names: attendance, hours, approvals
+              Names: attendance, hours, approvals, missing
 
             Updates
               punchpoint update [--repo owner/name] [--current x.y.z]
@@ -437,6 +437,34 @@ public static class Program
         }
 
         var employees = store.ListEmployees(includeInactive: true);
+
+        if (name.Equals("missing", StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine($"Missing punches — {period.Start:MMM d} – {period.End:MMM d, yyyy}");
+            Console.WriteLine();
+
+            int found = 0;
+            foreach (var employee in employees.OrderBy(e => e.SortName))
+            {
+                var shift = employee.ShiftId is int shiftId ? store.GetShift(shiftId) : null;
+                var punches = store.ListPunches(employee.Id, period.Start, period.End.AddDays(1));
+
+                foreach (var item in PunchPoint.Core.TimeCalc.MissingPunchFinder.Find(
+                             employee, shift, punches, settings.DayChangeOffsetMinutes,
+                             period.Start, period.End.AddDays(1)))
+                {
+                    found++;
+                    Console.WriteLine(
+                        $"{item.EmployeeName,-20} {item.WorkDate:ddd MMM d}  " +
+                        $"{(item.Kind == PunchKind.In ? "clock in " : "clock out")}  " +
+                        $"suggested {item.Suggested:h:mm tt}  ({item.Reason})");
+                }
+            }
+
+            if (found == 0) Console.WriteLine("Nothing missing in this period.");
+            return 0;
+        }
+
         var table = name.ToLowerInvariant() switch
         {
             "hours" => PunchPoint.Core.Reports.ReportBuilder.HoursSummary(store, period, settings, employees),

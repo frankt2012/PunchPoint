@@ -11,6 +11,7 @@ namespace PunchPoint.App;
 public sealed class MissingPunchDialog : Form
 {
     private const int FixColumn = 0;
+    private const int TimeColumn = 3;
 
     private readonly DataGridView _grid = new();
     private readonly List<MissingPunchSuggestion> _items;
@@ -41,7 +42,9 @@ public sealed class MissingPunchDialog : Form
 
         var heading = new Label
         {
-            Text = $"Fix missing punches — {employee.SortName}",
+            Text = shift is null
+                ? $"Fix missing punches — {employee.SortName} (no shift assigned)"
+                : $"Fix missing punches — {employee.SortName} · {shift.Name} {shift.Start:hh\\:mm}–{shift.Stop:hh\\:mm}",
             Font = Theme.H2,
             ForeColor = Theme.Text,
             Dock = DockStyle.Top,
@@ -52,7 +55,8 @@ public sealed class MissingPunchDialog : Form
         {
             Text = _items.Count == 0
                 ? "Nothing is missing: every clock-in in this period has a clock-out."
-                : "Suggested times come from the employee's shift. Untick anything that is wrong, then add the rest.",
+                : "The suggested time comes from the employee's shift (or eight hours from the punch that exists). " +
+                  "Click a time to change it before adding, and untick any day you do not want to fix.",
             Font = Theme.Small,
             ForeColor = Theme.TextMuted,
             Dock = DockStyle.Top,
@@ -72,7 +76,7 @@ public sealed class MissingPunchDialog : Form
         _grid.Columns.Add(fix);
         _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Day", FillWeight = 110, ReadOnly = true });
         _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Missing", FillWeight = 90, ReadOnly = true });
-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Suggested", FillWeight = 90, ReadOnly = true });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Suggested (edit)", FillWeight = 110, ReadOnly = false });
         _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Why", FillWeight = 300, ReadOnly = true });
 
         foreach (var item in _items)
@@ -128,7 +132,23 @@ public sealed class MissingPunchDialog : Form
         {
             if (row.Tag is not MissingPunchSuggestion item) continue;
             if (row.Cells[FixColumn].Value is not bool ticked || !ticked) continue;
-            Accepted.Add(item);
+
+            // The supervisor may have typed a different time; use it when it parses.
+            string typed = row.Cells[TimeColumn].Value?.ToString() ?? "";
+            if (DateTime.TryParse(typed, out var edited) && (edited.TimeOfDay > TimeSpan.Zero))
+            {
+                Accepted.Add(item with { Suggested = item.WorkDate.Date + edited.TimeOfDay });
+            }
+            else if (typed.Trim().Length == 0)
+            {
+                PromptDialog.Warn(this, "One of the times is empty. Type a time or untick that row.");
+                return;
+            }
+            else
+            {
+                PromptDialog.Warn(this, $"'{typed}' is not a time the app can read. Use something like 8:05 AM or 17:05.");
+                return;
+            }
         }
 
         if (Accepted.Count == 0)

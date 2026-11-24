@@ -11,8 +11,9 @@ the clock's exit password optional.
 ### What's new
 
 - **Fix missing punches.** Punch Editing has a **Fix missing…** button. It lists every day with
-  an unmatched clock-in or clock-out, suggests a time for the missing punch (the shift's start
-  or stop), and adds the ones you tick — with one entry in the activity log.
+  an unmatched clock-in or clock-out and suggests a time from the employee's shift — and every
+  suggested time can be **edited in the list** before you add it, so a late start or an odd day
+  is recorded correctly. Only the rows you tick are added, with one entry in the activity log.
 - **Attendance report.** A new report shows, per employee: work days, days late, total minutes
   late, early departures, and days with no punches at all. Weekends and holidays are skipped;
   employees without a shift are measured against 08:00–17:00 and marked as such.
