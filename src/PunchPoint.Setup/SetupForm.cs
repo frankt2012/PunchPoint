@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Principal;
 using Microsoft.Win32;
 using PunchPoint.App.UI;
@@ -238,6 +239,7 @@ public sealed class SetupForm : Form
 
             SetStatus("Creating shortcuts…", 60);
             CreateShortcuts(target);
+            RefreshShellIcons();
 
             SetStatus("Registering with Windows…", 75);
             WriteRegistry(target);
@@ -327,6 +329,38 @@ public sealed class SetupForm : Form
             CreateShortcut(Path.Combine(desktop, "Employee Clock.lnk"), Path.Combine(target, "PunchPointClock.exe"));
         }
     }
+
+    /// <summary>
+    /// Installing over an older version replaces the executables, but Explorer keeps the old
+    /// icon in its cache and the shortcuts keep showing it. Tell the shell the icons changed
+    /// and rebuild the cache so the new artwork appears straight away.
+    /// </summary>
+    private static void RefreshShellIcons()
+    {
+        const int SHCNE_ASSOCCHANGED = 0x08000000;
+        const uint SHCNF_IDLIST = 0x0000;
+
+        try { SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero); }
+        catch { /* cosmetic */ }
+
+        try
+        {
+            var process = Process.Start(new ProcessStartInfo("ie4uinit.exe", "-show")
+            {
+                CreateNoWindow = true,
+                UseShellExecute = false,
+                WindowStyle = ProcessWindowStyle.Hidden,
+            });
+            process?.WaitForExit(4000);
+        }
+        catch
+        {
+            // Older Windows builds do not have ie4uinit.exe; the notification above is enough.
+        }
+    }
+
+    [DllImport("shell32.dll", CharSet = CharSet.Unicode, PreserveSig = true)]
+    private static extern void SHChangeNotify(int eventId, uint flags, IntPtr item1, IntPtr item2);
 
     private static void CreateShortcut(string linkPath, string targetPath)
     {
