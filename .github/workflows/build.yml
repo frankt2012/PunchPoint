@@ -109,6 +109,28 @@ jobs:
             $section | Set-Content release-notes.md
           }
 
+          $footer = @"
+
+          ---
+
+          ### Install
+
+          1. Download **PunchPoint-Setup-$version.exe** below and run it.
+          2. The first time you open PunchPoint you choose a supervisor password.
+
+          Windows 11 (x64 or ARM64) · self-contained, no .NET install · your data lives in
+          ``C:\ProgramData\PunchPoint`` and survives upgrades.
+
+          Prefer no installer? The portable builds are attached as
+          ``PunchPoint-$version-win-x64.zip`` and ``PunchPoint-$version-win-arm64.zip`` — unzip and keep
+          both ``.exe`` files together.
+
+          [User guide](https://github.com/${{ github.repository }}/blob/main/docs/user-guide.md) ·
+          [Full changelog](https://github.com/${{ github.repository }}/blob/main/CHANGELOG.md)
+          "@
+
+          $footer | Out-File -Append -Encoding utf8 release-notes.md
+
       # Draft on purpose: a release becomes visible to the in-app update check only after it
       # has been installed and tested on Windows. Publish with scripts/publish-release.sh.
       - name: Create draft release

@@ -13,25 +13,40 @@ release, so a version stays a draft here until it has been tested on Windows.
 
 ## 1.5.2 — 2026-11-23
 
-- The installer now refreshes the Windows icon cache, so upgrading shows the new icon straight
-  away instead of keeping the old one.
+**Maintenance release.** Fixes the one cosmetic problem left after the icon change: Windows
+kept showing the previous icon after an upgrade.
+
+- **The new icon appears immediately.** The installer now tells Windows that the icons changed
+  and rebuilds its icon cache before it finishes, so the Start Menu, desktop shortcuts and the
+  window title bar all show the pin-and-clock artwork straight away. Before this, the old icon
+  could linger until the cache expired.
+- No changes to time records, settings or the database.
 
 ## 1.5.1 — 2026-11-23
 
-- Update messages read `1.5.0` rather than `1.5.0.0`.
+**Maintenance release.** Corrects the wording of the update message.
+
+- Version numbers in the update check read `1.5.1` instead of `1.5.1.0`, matching the version
+  shown in the app and on this page.
+- Everything else is unchanged from 1.5.0.
 
 ## 1.5.0 — 2026-11-23
 
+**Feature release.** Gives PunchPoint its own identity and a way to tell you when there is a
+newer version.
+
 ### What's new
 
-- **New application icon**: navy pin with a clock face, used by the admin app, the clock and the
-  installer.
-- **Check for updates.** Once a day the admin app asks GitHub for a newer release and, when
-  there is one, shows its notes with a Download button. **Settings → Updates** shows the
-  version, lets you check immediately, and can skip a release. PunchPoint never installs
-  anything by itself.
-- **Publishing is automated**: pushing a `v*` tag builds both architectures on GitHub Actions
-  and attaches the installers.
+- **New application icon.** A navy location pin holding a clock face, used by both programs,
+  the installer, the Start Menu shortcuts and the window title bar.
+- **Check for updates.** Once a day, when the supervisor app opens, PunchPoint asks GitHub
+  whether a newer release exists. If there is one it shows the release notes with a
+  **Download** button that opens this page — and a **Skip this version** option for releases you
+  do not want. Nothing is downloaded or installed by itself.
+  **Settings → Updates** shows the version you are running, lets you check immediately, and can
+  turn the daily check off.
+- **Automatic publishing.** Pushing a version tag makes GitHub Actions run the tests, build the
+  x64 and ARM64 programs, build the installer and attach everything to the release.
 
 ## 1.4.0 — 2026-11-23
 
