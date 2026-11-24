@@ -3,7 +3,7 @@
 What changed in each release, in plain language. Update checks read the newest **published**
 release, so a version stays a draft here until it has been tested on Windows.
 
-## 1.6.1 — 2026-11-24
+## 1.6.2 — 2026-11-24
 
 **Feature release.** Punctuality reporting, a visible activity history and automatic backups
 with an optional cloud copy — plus an optional password on closing the clock.
@@ -11,8 +11,9 @@ with an optional cloud copy — plus an optional password on closing the clock.
 ### What's new
 
 - **Attendance report.** A new report shows, per employee: work days, days late, total minutes
-  late, early departures, and days with no punches at all. Weekends and holidays are skipped;
-  employees without a shift are measured against 08:00–17:00 and marked as such.
+  late, early departures, and days with no punches at all. Weekends and holidays are skipped.
+  Punctuality needs a schedule: employees with no shift assigned show "—" for late/early
+  (absences are still counted) instead of being measured against a guessed 08:00–17:00.
 - **Activity log.** Settings → Your data → **Activity log…** shows the last 500 recorded
   changes: imports, punch edits, approvals, settings, backups — with the user and the time.
 - **Backups on autopilot.** One backup is taken each day automatically (whichever program runs

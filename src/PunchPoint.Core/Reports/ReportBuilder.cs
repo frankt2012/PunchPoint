@@ -164,7 +164,11 @@ public static class ReportBuilder
         foreach (var employee in employees.OrderBy(e => e.SortName))
         {
             var shift = (employee.ShiftId is int id ? store.GetShift(id) : null) ?? defaultShift;
-            bool hasShift = employee.ShiftId is not null;
+
+            // Without a shift there is no schedule to be late for. Counting absences is still
+            // useful; inventing a start time would produce numbers that look authoritative and
+            // are wrong.
+            bool measured = employee.ShiftId is not null && store.GetShift(employee.ShiftId.Value) is not null;
 
             var punches = store.ListPunches(employee.Id, period.Start, period.End.AddDays(1));
             var byDay = punches
@@ -195,13 +199,13 @@ public static class ReportBuilder
                 var expectedStop = day.Add(shift.Stop).AddMinutes(-shift.StopGraceMinutes);
                 if (shift.Stop <= shift.Start) expectedStop = expectedStop.AddDays(1);
 
-                if (firstIn is DateTime clockIn && clockIn > expectedStart)
+                if (measured && firstIn is DateTime clockIn && clockIn > expectedStart)
                 {
                     late++;
                     lateMinutes += (int)(clockIn - expectedStart).TotalMinutes;
                 }
 
-                if (lastOut is DateTime clockOut && clockOut < expectedStop)
+                if (measured && lastOut is DateTime clockOut && clockOut < expectedStop)
                 {
                     early++;
                     earlyMinutes += (int)(expectedStop - clockOut).TotalMinutes;
@@ -217,12 +221,12 @@ public static class ReportBuilder
 
             table.AddRow(
                 employee.SortName,
-                hasShift ? shift.Name : shift.Name + " (default)",
+                measured ? shift.Name : "no shift — not measured",
                 workDays.ToString(),
-                late.ToString(),
-                late == 0 ? "" : Hours(lateMinutes, settings.TotalsFormat),
-                early.ToString(),
-                early == 0 ? "" : Hours(earlyMinutes, settings.TotalsFormat),
+                measured ? late.ToString() : "—",
+                measured && late > 0 ? Hours(lateMinutes, settings.TotalsFormat) : "",
+                measured ? early.ToString() : "—",
+                measured && early > 0 ? Hours(earlyMinutes, settings.TotalsFormat) : "",
                 absent.ToString());
         }
 

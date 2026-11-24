@@ -311,3 +311,46 @@ public class AttendanceFutureDaysTests
         }
     }
 }
+
+public class AttendanceWithoutShiftTests
+{
+    [Fact]
+    public void Employees_without_a_shift_are_not_scored_for_punctuality()
+    {
+        string path = TestPaths.NewDatabasePath();
+        try
+        {
+            using var database = Database.Open(path);
+            var store = new Store(database);
+
+            var employee = new Employee { FirstName = "No", LastName = "Shift", Pin = "7" };
+            store.InsertEmployee(employee);
+
+            var period = new PayPeriod
+            {
+                Start = new DateTime(2026, 11, 16),
+                End = new DateTime(2026, 11, 20),
+                Type = PayPeriodType.Weekly,
+            };
+            store.UpsertPayPeriod(period);
+
+            store.InsertPunch(new Punch { EmployeeId = employee.Id, Timestamp = new DateTime(2026, 11, 16, 10, 30, 0), Kind = PunchKind.In });
+            store.InsertPunch(new Punch { EmployeeId = employee.Id, Timestamp = new DateTime(2026, 11, 16, 15, 0, 0), Kind = PunchKind.Out });
+
+            var table = ReportBuilder.Attendance(store, period, store.GetSettings(), new[] { employee });
+            var row = table.Rows[0];
+
+            Assert.Contains("no shift", row[1]);
+            Assert.Equal("—", row[3]);   // late: not measured
+            Assert.Equal("—", row[5]);   // early: not measured
+            Assert.Equal("4", row[7]);   // the other four days are absences
+        }
+        finally
+        {
+            foreach (string suffix in new[] { "", "-wal", "-shm" })
+            {
+                try { File.Delete(path + suffix); } catch { }
+            }
+        }
+    }
+}
