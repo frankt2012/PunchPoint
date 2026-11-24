@@ -3,7 +3,19 @@
 What changed in each release, in plain language. Update checks read the newest **published**
 release, so a version stays a draft here until it has been tested on Windows.
 
-## Unreleased
+## 1.5.3 — 2026-11-24
+
+**Appearance and reliability update.** The dark theme keeps the card shading from the design
+exploration, and installing no longer leaves the data folder writable only by administrators.
+
+### What's new
+
+- **Dark-mode shading.** Cards now carry a hairline border and softly rounded corners, and
+  tables use alternating row shading, so each panel reads as its own surface instead of one
+  flat sheet. Light mode gets the same subtle edges; nothing else about the screens changes —
+  the layout, wording and controls are the 1.5.2 interface.
+
+### Fixes
 
 - **Installing no longer leaves the data folder admin-only.** The setup program started the
   supervisor app with its own administrator rights, so the app created the database as

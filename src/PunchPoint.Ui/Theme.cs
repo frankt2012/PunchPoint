@@ -32,6 +32,9 @@ public static class Theme
     public static Color Danger { get; private set; }
     public static Color DangerSoft { get; private set; }
 
+    /// <summary>Alternate grid row background (zebra striping).</summary>
+    public static Color RowAlt { get; private set; }
+
     public static Color Text { get; private set; }
     public static Color TextMuted { get; private set; }
     public static Color TextFaint { get; private set; }
@@ -80,6 +83,8 @@ public static class Theme
             Danger = Color.FromArgb(0xEF, 0x44, 0x44);
             DangerSoft = Color.FromArgb(0x3A, 0x14, 0x14);
 
+            RowAlt = Color.FromArgb(0x17, 0x20, 0x2F);
+
             Text = Color.FromArgb(0xE6, 0xED, 0xF7);
             TextMuted = Color.FromArgb(0x93, 0xA4, 0xBD);
             TextFaint = Color.FromArgb(0x6B, 0x7C, 0x96);
@@ -107,6 +112,8 @@ public static class Theme
             WarningSoft = Color.FromArgb(0xFE, 0xF3, 0xC7);
             Danger = Color.FromArgb(0xDC, 0x26, 0x26);
             DangerSoft = Color.FromArgb(0xFE, 0xE2, 0xE2);
+
+            RowAlt = Color.FromArgb(0xF8, 0xFA, 0xFC);
 
             Text = Color.FromArgb(0x0F, 0x17, 0x2A);
             TextMuted = Color.FromArgb(0x64, 0x74, 0x8B);
@@ -428,16 +435,8 @@ public static class Theme
     };
 
     /// <summary>A white rounded-ish card panel with a subtle border.</summary>
-    public static Panel Card(int padding = 18, Color? background = null) => new()
-    {
-        BackColor = background ?? Surface,
-        Padding = new Padding(padding),
-        Margin = new Padding(0, 0, 0, 14),
-        Dock = DockStyle.Top,
-        AutoSize = true,
-        AutoSizeMode = AutoSizeMode.GrowAndShrink,
-        MinimumSize = new Size(0, 48),
-    };
+    public static Panel Card(int padding = 18, Color? background = null) =>
+        new CardPanel(padding, background);
 
     public static FlowLayoutPanel Row(int spacing = 8) => new()
     {
@@ -501,6 +500,10 @@ public static class Theme
         grid.DefaultCellStyle.Font = Body;
         grid.DefaultCellStyle.SelectionBackColor = PrimarySoft;
         grid.DefaultCellStyle.SelectionForeColor = Text;
+        grid.AlternatingRowsDefaultCellStyle.BackColor = RowAlt;
+        grid.AlternatingRowsDefaultCellStyle.ForeColor = Text;
+        grid.AlternatingRowsDefaultCellStyle.SelectionBackColor = PrimarySoft;
+        grid.AlternatingRowsDefaultCellStyle.SelectionForeColor = Text;
         grid.DefaultCellStyle.Padding = new Padding(6, 2, 6, 2);
         grid.RowHeadersVisible = false;
         grid.RowTemplate.Height = 34;
