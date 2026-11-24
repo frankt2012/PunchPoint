@@ -39,11 +39,22 @@ public sealed class KioskForm : Form
     private Employee? _selected;
     private DateTime _resetAt;
     private bool _allowClose;
+    private bool _compact;
+    private TableLayoutPanel? _root;
+    private Control? _clockCard;
+    private Control? _recentCard;
+    private Control? _rightCard;
+    private TableLayoutPanel? _keypad;
+    private TableLayoutPanel? _pinGrid;
+    private string? _layoutLog;
+    private Control? _personStack;
+    private Panel? _personSpacer;
+    private Control? _clockStack;
     private bool _punching;
     private bool _hasEmployees;
     private AppSettings _settings;
 
-    public KioskForm(Store store, bool fullScreen)
+    public KioskForm(Store store, bool fullScreen, Size? sizeOverride = null)
     {
         _store = store;
         _clock = new ClockService(store);
@@ -69,10 +80,10 @@ public sealed class KioskForm : Form
             // Shared PC: an ordinary window that can be minimised while other programs run.
             FormBorderStyle = FormBorderStyle.Sizable;
             StartPosition = FormStartPosition.CenterScreen;
-            Size = new Size(
-                Math.Clamp(_settings.ClockWidth, 820, 2400),
-                Math.Clamp(_settings.ClockHeight, 620, 1600));
-            MinimumSize = new Size(820, 620);
+            Size = sizeOverride ?? new Size(
+                Math.Clamp(_settings.ClockWidth, 640, 2400),
+                Math.Clamp(_settings.ClockHeight, 480, 1600));
+            MinimumSize = new Size(640, 480);
             TopMost = false;
             MaximizeBox = true;
             MinimizeBox = true;
@@ -95,64 +106,62 @@ public sealed class KioskForm : Form
 
     private void BuildUi()
     {
-        var root = new TableLayoutPanel
+        _root = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
-            RowCount = 1,
+            RowCount = 2,
             Padding = new Padding(22),
             BackColor = Theme.Canvas,
         };
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58));
-        root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42));
+        _root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 58));
+        _root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 42));
+        _root.RowStyles.Add(new RowStyle(SizeType.Absolute, 250));
+        _root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
-        var left = new TableLayoutPanel
-        {
-            Dock = DockStyle.Fill,
-            ColumnCount = 1,
-            RowCount = 2,
-            Margin = new Padding(0, 0, 10, 0),
-        };
-        left.RowStyles.Add(new RowStyle(SizeType.Absolute, 250));
-        left.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        // Clock
+        var clockCard = Theme.Card(28);
+        clockCard.Dock = DockStyle.Fill;
+        clockCard.AutoSize = false;          // fill the row, do not shrink to the text
+        clockCard.MinimumSize = Size.Empty;
+        clockCard.Margin = new Padding(0, 0, 10, 0);
 
-        // Clock card
-        var clockCard = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Surface, Padding = new Padding(28, 20, 28, 16) };
+        var clockStack = new StackPanel(2) { Dock = DockStyle.Fill, Padding = new Padding(0) };
 
-        _time.Font = new Font(Theme.Family, 58f, FontStyle.Bold);
         _time.ForeColor = Theme.Text;
         _time.AutoSize = true;
-        _time.Location = new Point(24, 0);
+        _time.Dock = DockStyle.Top;
+        _time.Margin = new Padding(0);
 
-        _date.Font = new Font(Theme.Family, 13f);
         _date.ForeColor = Theme.TextMuted;
         _date.AutoSize = true;
-        _date.Location = new Point(28, 100);
+        _date.Dock = DockStyle.Top;
+        _date.Margin = new Padding(0, 8, 0, 6);
 
-        _message.Font = new Font(Theme.Family, 11f, FontStyle.Italic);
         _message.ForeColor = Theme.Primary;
         _message.AutoSize = true;
-        _message.MaximumSize = new Size(700, 0);
-        _message.Location = new Point(28, 140);
+        _message.MaximumSize = new Size(0, 0);
+        _message.Dock = DockStyle.Top;
+        _message.Margin = new Padding(0, 0, 0, 6);
 
         _feedback.Font = new Font(Theme.Family, 13f, FontStyle.Bold);
         _feedback.AutoSize = true;
-        _feedback.Location = new Point(28, 195);
+        _feedback.Dock = DockStyle.Top;
+        _feedback.Margin = new Padding(0);
 
-        clockCard.Controls.Add(_time);
-        clockCard.Controls.Add(_date);
-        clockCard.Controls.Add(_message);
-        clockCard.Controls.Add(_feedback);
-        left.Controls.Add(clockCard, 0, 0);
+        // Order matters: the first control added is the top row.
+        clockStack.Controls.Add(_time);
+        clockStack.Controls.Add(_date);
+        clockStack.Controls.Add(_message);
+        clockStack.Controls.Add(_feedback);
+        clockCard.Controls.Add(clockStack);
 
         // Recent activity
-        var recentCard = new Panel
-        {
-            Dock = DockStyle.Fill,
-            BackColor = Theme.Surface,
-            Padding = new Padding(16, 12, 16, 12),
-            Margin = new Padding(0, 12, 0, 0),
-        };
+        var recentCard = Theme.Card(16);
+        recentCard.Dock = DockStyle.Fill;
+        recentCard.AutoSize = false;
+        recentCard.MinimumSize = Size.Empty;
+        recentCard.Margin = new Padding(0, 12, 10, 0);
 
         var recentTitle = new Label
         {
@@ -163,16 +172,20 @@ public sealed class KioskForm : Form
             Height = 34,
         };
 
-        Theme.StyleGrid(_recent);
-        _recent.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Employee", FillWeight = 200 });
-        _recent.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Punch", FillWeight = 110 });
-        _recent.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Time", FillWeight = 110 });
-        _recent.RowTemplate.Height = 30;
+        if (_recent.Columns.Count == 0)
+        {
+            Theme.StyleGrid(_recent);
+            _recent.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Employee", FillWeight = 200 });
+            _recent.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Punch", FillWeight = 110 });
+            _recent.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = "Time", FillWeight = 110 });
+            _recent.RowTemplate.Height = 30;
+        }
 
         _recentEmpty.AutoSize = true;
         _recentEmpty.Font = Theme.Small;
         _recentEmpty.ForeColor = Theme.TextMuted;
-        _recentEmpty.Location = new Point(6, 46);
+        _recentEmpty.Dock = DockStyle.Top;
+        _recentEmpty.Margin = new Padding(6, 8, 0, 0);
 
         var recentHost = new Panel { Dock = DockStyle.Fill };
         recentHost.Controls.Add(_recent);
@@ -181,52 +194,255 @@ public sealed class KioskForm : Form
 
         recentCard.Controls.Add(recentHost);
         recentCard.Controls.Add(recentTitle);
-        left.Controls.Add(recentCard, 0, 1);
 
-        // Right side: PIN pad or person card
-        var rightCard = new Panel { Dock = DockStyle.Fill, BackColor = Theme.Surface, Margin = new Padding(10, 0, 0, 0) };
+        // PIN pad or person card
+        var rightCard = Theme.Card(0);
+        rightCard.Dock = DockStyle.Fill;
+        rightCard.AutoSize = false;          // let the keypad row use the full height
+        rightCard.MinimumSize = Size.Empty;
         BuildPinPanel();
         BuildPersonPanel();
         rightCard.Controls.Add(_personPanel);
         rightCard.Controls.Add(_pinPanel);
 
-        root.Controls.Add(left, 0, 0);
-        root.Controls.Add(rightCard, 1, 0);
-        Controls.Add(root);
+        _root.Controls.Add(clockCard, 0, 0);
+        _root.Controls.Add(recentCard, 0, 1);
+        _root.Controls.Add(rightCard, 1, 0);
+        _root.SetRowSpan(rightCard, 2);
 
-        // Supervisor exit. It always asks for the password once one is set.
-        var exit = new Button
+        _clockCard = clockCard;
+        _recentCard = recentCard;
+        _rightCard = rightCard;
+        _clockStack = clockStack;
+
+        Controls.Add(_root);
+
+        // Supervisor exit for kiosk mode, where there is no title bar. A windowed clock can be
+        // closed with its own X (or Alt+F4), and both ask for the password.
+        if (_fullScreen)
         {
-            Text = "Supervisor",
-            FlatStyle = FlatStyle.Flat,
-            Size = new Size(96, 30),
-            Anchor = AnchorStyles.Top | AnchorStyles.Right,
-            BackColor = Theme.Canvas,
-            ForeColor = Theme.TextFaint,
-            Font = Theme.Small,
-            Cursor = Cursors.Hand,
-            TabStop = false,
-        };
-        exit.FlatAppearance.BorderSize = 0;
-        exit.Location = new Point(ClientSize.Width - 106, 8);
-        exit.Click += (_, _) => SupervisorExit();
-        Controls.Add(exit);
-        exit.BringToFront();
-        Resize += (_, _) => exit.Location = new Point(ClientSize.Width - 106, 8);
+            var exit = new Button
+            {
+                Text = "Supervisor",
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(96, 30),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                BackColor = Theme.Canvas,
+                ForeColor = Theme.TextFaint,
+                Font = Theme.Small,
+                Cursor = Cursors.Hand,
+                TabStop = false,
+            };
+            exit.FlatAppearance.BorderSize = 0;
+            exit.Location = new Point(ClientSize.Width - 106, 8);
+            exit.Click += (_, _) => SupervisorExit();
+            Controls.Add(exit);
+            exit.BringToFront();
+            Resize += (_, _) => exit.Location = new Point(ClientSize.Width - 106, 8);
+        }
+
+        ApplyLayout();
+    }
+
+    /// <summary>
+    /// Wide windows use two columns; anything under 760 px collapses to one column with the
+    /// clock on top, and the recent-activity panel is hidden so the PIN pad keeps its room.
+    /// </summary>
+    private void ApplyLayout()
+    {
+        if (_root is null) return;
+
+        bool compact = !_fullScreen && ClientSize.Width < 760;
+
+        _root.SuspendLayout();
+        _compact = compact;
+
+        _root.Padding = new Padding(compact ? 10 : 22);
+        _root.ColumnStyles[0] = new ColumnStyle(SizeType.Percent, compact ? 100 : 58);
+        _root.ColumnStyles[1] = new ColumnStyle(SizeType.Percent, compact ? 0 : 42);
+        _root.RowStyles[0] = new RowStyle(SizeType.Absolute, compact ? 136 : 250);
+
+        if (_clockCard is Control clock)
+        {
+            _root.SetColumnSpan(clock, compact ? 2 : 1);
+            clock.Margin = new Padding(0, 0, compact ? 0 : 10, 0);
+            (clock as CardPanel)?.SetPadding(compact ? 12 : 28);
+        }
+
+        if (_rightCard is Control right)
+        {
+            _root.SetColumnSpan(right, compact ? 2 : 1);
+            _root.SetRowSpan(right, compact ? 1 : 2);
+            _root.SetCellPosition(right, new TableLayoutPanelCellPosition(compact ? 0 : 1, compact ? 1 : 0));
+            right.Margin = compact ? new Padding(0, 8, 0, 0) : new Padding(10, 0, 0, 0);
+        }
+
+        if (_recentCard is Control recent) recent.Visible = !compact;
+
+        if (_pinGrid is not null)
+            _pinGrid.Padding = compact ? new Padding(14, 6, 14, 6) : new Padding(14, 12, 14, 12);
+
+        // The keypad takes whatever height is left after the title, PIN box and error line.
+        if (_keypad is not null)
+        {
+            _keypad.MaximumSize = new Size(0, compact ? 372 : 432);
+            _keypad.AutoSize = false;
+        }
+
+        if (_personStack is Control personStack)
+            personStack.Padding = compact ? new Padding(14, 8, 14, 8) : new Padding(26, 30, 26, 18);
+
+        if (_personSpacer is not null) _personSpacer.Height = compact ? 6 : 16;
+
+        _personDetail.Font = new Font(Theme.Family, compact ? 10f : 10.5f);
+        _countdown.Font = compact ? new Font(Theme.Family, 9f) : Theme.Small;
+        _countdown.Margin = new Padding(0, compact ? 6 : 16, 0, 0);
+
+        _pin.Height = compact ? 40 : 54;
+
+        ScaleType(compact);
+
+        _root.ResumeLayout();
+        PerformLayout();
+    }
+
+    private void ScaleType(bool compact)
+    {
+        float timeSize = !_fullScreen && compact
+            ? Math.Clamp(ClientSize.Width / 17f, 28f, 46f)
+            : 58f;
+
+        _time.Font = new Font(Theme.Family, timeSize, FontStyle.Bold);
+        _date.Font = new Font(Theme.Family, compact ? 10.5f : 13f);
+        _message.Font = new Font(Theme.Family, compact ? 9.5f : 11f, FontStyle.Italic);
+        _feedback.Font = new Font(Theme.Family, compact ? 11f : 13f, FontStyle.Bold);
+        _personName.Font = new Font(Theme.Family, compact ? 19f : 24f, FontStyle.Bold);
+        _personState.Font = new Font(Theme.Family, compact ? 13f : 15f, FontStyle.Bold);
+
+        _pin.Font = new Font(Theme.Family, compact ? 22f : 26f, FontStyle.Bold);
+
+        var pad = FindKeypad();
+        if (pad is not null)
+        {
+            pad.Margin = compact ? new Padding(0, 6, 0, 0) : new Padding(0, 8, 0, 0);
+            foreach (Control key in pad.Controls)
+                key.Margin = compact ? new Padding(3) : new Padding(5);
+        }
+    }
+
+    /// <summary>
+    /// Key labels are sized from the button they sit in, so a short window gets smaller
+    /// digits instead of clipped ones. Runs on every keypad layout; the size check stops
+    /// the font change from triggering another pass.
+    /// </summary>
+    private static void FitKeypadType(TableLayoutPanel pad)
+    {
+        foreach (Control key in pad.Controls)
+        {
+            bool digit = key.Text.Length == 1;
+            float size = Math.Clamp((key.Height - 10) * (digit ? 0.52f : 0.40f), 9f, digit ? 24f : 13f);
+            if (Math.Abs(key.Font.Size - size) < 0.6f) continue;
+            key.Font = new Font(Theme.Family, size, digit ? FontStyle.Bold : FontStyle.Regular);
+        }
+    }
+
+    private TableLayoutPanel? FindKeypad()
+    {
+        if (_keypad is not null) return _keypad;
+
+        // Built inside BuildPinPanel; find it once.
+        static TableLayoutPanel? Find(Control parent)
+        {
+            foreach (Control child in parent.Controls)
+            {
+                if (child is TableLayoutPanel { ColumnCount: 3 } table) return table;
+                if (Find(child) is TableLayoutPanel found) return found;
+            }
+            return null;
+        }
+
+        _keypad = Find(_pinPanel);
+        return _keypad;
+    }
+
+    public void EnableLayoutLog(string path) => _layoutLog = path;
+
+    private void DumpLayout()
+    {
+        if (_layoutLog is null) return;
+        try
+        {
+            var lines = new List<string>
+            {
+                $"client      {ClientSize.Width}x{ClientSize.Height}",
+                $"root        {_root?.Size}",
+                $"clockCard   {_clockCard?.Bounds}",
+                $"rightCard   {_rightCard?.Bounds}",
+                $"pinPanel    {_pinPanel.Bounds}",
+                $"pinGrid     {_pinGrid?.Bounds} padding={_pinGrid?.Padding}",
+                $"pinBox      {_pin.Bounds}",
+                $"keypad      {_keypad?.Bounds}",
+            };
+            if (_pinGrid is not null)
+                for (int i = 0; i < _pinGrid.RowStyles.Count; i++)
+                    lines.Add($"  gridRow{i} {_pinGrid.RowStyles[i].SizeType} {_pinGrid.RowStyles[i].Height}");
+            if (_keypad is not null)
+                for (int i = 0; i < _keypad.RowStyles.Count; i++)
+                    lines.Add($"  padRow{i}  {_keypad.RowStyles[i].SizeType} {_keypad.RowStyles[i].Height}");
+            if (_keypad is not null && _keypad.Controls.Count > 0)
+                lines.Add($"  key0 {_keypad.Controls[0].Bounds} font={_keypad.Controls[0].Font.Size}");
+            File.WriteAllLines(_layoutLog, lines);
+        }
+        catch
+        {
+            // diagnostics only
+        }
+    }
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        BeginInvoke(new Action(DumpLayout));
+    }
+
+    protected override void OnResize(EventArgs e)
+    {
+        base.OnResize(e);
+
+        if (_fullScreen || _root is null) return;
+
+        bool compact = ClientSize.Width < 760;
+        if (compact != _compact) ApplyLayout();
+        else if (!compact) _time.Font = new Font(Theme.Family, 58f, FontStyle.Bold);
+        BeginInvoke(new Action(DumpLayout));
     }
 
     private void BuildPinPanel()
     {
         _pinPanel.Dock = DockStyle.Fill;
 
-        var stack = new StackPanel(10)
+        var grid = new TableLayoutPanel
         {
-            Padding = new Padding(30, 14, 30, 12),
             Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 4,
+            Padding = new Padding(30, 14, 30, 12),
         };
-        _pinPanel.Controls.Add(stack);
+        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        grid.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+        _pinPanel.Controls.Add(grid);
+        _pinGrid = grid;
 
-        stack.Add(new Label { Text = "Enter your PIN", Font = Theme.H2, ForeColor = Theme.Text, AutoSize = true });
+        grid.Controls.Add(new Label
+        {
+            Text = "Enter your PIN",
+            Font = Theme.H2,
+            ForeColor = Theme.Text,
+            AutoSize = true,
+            Margin = new Padding(0, 0, 0, 6),
+        }, 0, 0);
 
         _pin.Font = new Font(Theme.Family, 26f, FontStyle.Bold);
         _pin.TextAlign = HorizontalAlignment.Center;
@@ -237,6 +453,7 @@ public sealed class KioskForm : Form
         _pin.BackColor = Theme.InputBackground;
         _pin.ForeColor = Theme.Text;
         _pin.Dock = DockStyle.Top;
+        _pin.Margin = new Padding(0);
         _pin.TextChanged += (_, _) =>
         {
             _pinError.Text = "";
@@ -250,21 +467,22 @@ public sealed class KioskForm : Form
                 Identify();
             }
         };
-        stack.Add(_pin);
+        grid.Controls.Add(_pin, 0, 1);
 
         _pinError.AutoSize = true;
         _pinError.ForeColor = Theme.Danger;
         _pinError.Font = Theme.SmallBold;
-        stack.Add(_pinError);
+        _pinError.Margin = new Padding(0, 6, 0, 0);
+        grid.Controls.Add(_pinError, 0, 2);
 
         var pad = new TableLayoutPanel
         {
             ColumnCount = 3,
             RowCount = 4,
-            Dock = DockStyle.Top,
-            Height = 320,
+            Dock = DockStyle.Fill,
             Margin = new Padding(0, 8, 0, 0),
         };
+        pad.Layout += (_, _) => FitKeypadType(pad);
         for (int i = 0; i < 3; i++) pad.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 33.33f));
         for (int i = 0; i < 4; i++) pad.RowStyles.Add(new RowStyle(SizeType.Percent, 25f));
 
@@ -288,7 +506,8 @@ public sealed class KioskForm : Form
             button.Click += (_, _) => PressKey(key);
             pad.Controls.Add(button, i % 3, i / 3);
         }
-        stack.Add(pad);
+        grid.Controls.Add(pad, 0, 3);
+        _keypad = pad;
     }
 
     private void BuildPersonPanel()
@@ -298,6 +517,7 @@ public sealed class KioskForm : Form
 
         var stack = new StackPanel(8) { Padding = new Padding(26, 30, 26, 18) };
         _personPanel.Controls.Add(stack);
+        _personStack = stack;
 
         _personName.Font = new Font(Theme.Family, 24f, FontStyle.Bold);
         _personName.ForeColor = Theme.Text;
@@ -314,7 +534,8 @@ public sealed class KioskForm : Form
         stack.Add(_personName);
         stack.Add(_personState);
         stack.Add(_personDetail);
-        stack.Add(new Panel { Height = 16, Dock = DockStyle.Top });
+        _personSpacer = new Panel { Height = 16, Dock = DockStyle.Top };
+        stack.Add(_personSpacer);
 
         _personButtons.FlowDirection = FlowDirection.TopDown;
         _personButtons.AutoSize = true;
@@ -394,7 +615,7 @@ public sealed class KioskForm : Form
         {
             Text = status.ActionLabel,
             Width = 340,
-            Height = 64,
+            Height = _compact ? 48 : 64,
             FlatStyle = FlatStyle.Flat,
             BackColor = status.IsClockedIn ? Theme.Danger : Theme.Success,
             ForeColor = Color.White,
@@ -408,13 +629,13 @@ public sealed class KioskForm : Form
         if (status.IsClockedIn && !status.OnBreak)
         {
             var breakButton = Theme.SecondaryButton("Start unpaid break", 340);
-            breakButton.Height = 44;
+            breakButton.Height = _compact ? 34 : 44;
             breakButton.Click += (_, _) => PerformPunch(PunchKind.BreakOut);
             _personButtons.Controls.Add(breakButton);
         }
 
         var cancel = Theme.SecondaryButton("Not me", 340);
-        cancel.Height = 40;
+        cancel.Height = _compact ? 32 : 40;
         cancel.Click += (_, _) => Reset();
         _personButtons.Controls.Add(cancel);
 

@@ -8,7 +8,13 @@ PunchPoint is two programs:
   window so the PC can be used for other work at the same time. On a PC used only for
   clocking in, set Settings → Company → **Clock window** to *Full screen kiosk*: it then
   covers the screen, stays on top, and cannot be closed without the password. Either way,
-  **Ctrl+Shift+E** or the **Supervisor** button (top-right) asks for the password.
+  **Ctrl+Shift+E** asks for the password, as does the window's close button (or, in kiosk
+  mode, the **Supervisor** button in the top-right corner).
+
+  The windowed clock can be resized by dragging its edge, down to 640×480, and it remembers
+  the size you leave it at. Below about 760 px wide it rearranges into a single column — clock
+  on top, PIN pad below — and hides the recent-activity list so the keys stay large enough to
+  tap.
 * **PunchPoint.exe** — the management app. It asks for the supervisor password every time
   it starts, and creates one on first run.
 

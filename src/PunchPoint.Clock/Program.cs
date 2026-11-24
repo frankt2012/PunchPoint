@@ -55,6 +55,17 @@ internal static class Program
             Fmt.Totals = settings.TotalsFormat;
             bool fullScreen = forced ?? settings.ClockFullScreen;
 
+            // Diagnostics: open at a fixed size, e.g. --size 640x480.
+            string? layoutLog = ValueOf(args, "--layout-log");
+            Size? sizeOverride = null;
+            string? sizeArg = ValueOf(args, "--size");
+            if (sizeArg is not null)
+            {
+                string[] parts = sizeArg.ToLowerInvariant().Split('x');
+                if (parts.Length == 2 && int.TryParse(parts[0], out int w) && int.TryParse(parts[1], out int h))
+                    sizeOverride = new Size(Math.Max(640, w), Math.Max(480, h));
+            }
+
             store.Audit("Clock started", fullScreen ? "kiosk mode" : "windowed mode");
 
             // The clock usually runs all day, so it takes the daily backup too.
@@ -90,7 +101,9 @@ internal static class Program
             });
             mailTimer.Start();
 
-            Application.Run(new KioskForm(store, fullScreen));
+            var kiosk = new KioskForm(store, fullScreen, sizeOverride);
+            if (layoutLog is not null) kiosk.EnableLayoutLog(layoutLog);
+            Application.Run(kiosk);
             store.Audit("Clock closed", Environment.UserName);
         }
         catch (Exception ex)

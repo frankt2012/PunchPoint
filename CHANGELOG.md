@@ -3,6 +3,21 @@
 What changed in each release, in plain language. Update checks read the newest **published**
 release, so a version stays a draft here until it has been tested on Windows.
 
+## 1.6.6 — 2026-11-24
+
+**The clock fits a small window.**
+
+- The windowed clock can now be dragged down to **640×480** (it used to stop at 820×620), and
+  it still remembers the size you leave it at.
+- Below about 760 px wide it rearranges itself into **one column** — clock on top, PIN pad
+  underneath — and hides the recent-activity list so the keypad keeps its room.
+- The clock text, PIN box and keypad keys **scale with the window**, so nothing is clipped at
+  any size. The keypad fills the space it is given instead of a fixed 320 px block.
+- Windowed mode no longer shows the small **Supervisor** link in the corner: the window's own
+  close button (or Alt+F4) asks for the password. Kiosk mode keeps the link.
+- `PunchPointClock.exe --windowed --size 640x480` opens at an exact size, which makes trying a
+  small window easy.
+
 ## 1.6.5 — 2026-11-24
 
 **Fixes in the period lists.**

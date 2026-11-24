@@ -10,7 +10,7 @@ public sealed class CardPanel : Panel
 {
     private const int Radius = 8;
 
-    private readonly int _padding;
+    private int _padding;
 
     public CardPanel(int padding = 18, Color? background = null)
     {
@@ -23,6 +23,13 @@ public sealed class CardPanel : Panel
         AutoSizeMode = AutoSizeMode.GrowAndShrink;
         MinimumSize = new Size(0, 48);
         Resize += (_, _) => Clip();
+    }
+
+    /// <summary>Cards keep their padding by design; this is the one supported way to change it.</summary>
+    public void SetPadding(int padding)
+    {
+        _padding = padding;
+        Padding = new Padding(padding);
     }
 
     protected override void OnPaddingChanged(EventArgs e)
