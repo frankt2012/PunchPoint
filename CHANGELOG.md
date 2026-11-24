@@ -3,6 +3,19 @@
 What changed in each release, in plain language. Update checks read the newest **published**
 release, so a version stays a draft here until it has been tested on Windows.
 
+## 1.6.5 — 2026-11-24
+
+**Fixes in the period lists.**
+
+- **"Current" now marks the right period.** After an import two periods could cover the same
+  day, and the label was attached to whichever came first in the list — so the week you were in
+  showed no "Current" while "Previous" appeared one week too late. The label now follows the
+  period the app treats as current.
+- **The drop-down stops after next period.** It used to list every period generated ahead
+  (three months of future weeks). Now it shows your history, the current period and the next
+  one; later periods still exist for assignment but are not offered in the picker.
+- Periods left over from an earlier start date no longer appear in the lists at all.
+
 ## 1.6.4 — 2026-11-24
 
 **Fix: pay periods could be off by a day after an import.** If a Wednesday-to-Tuesday shop

@@ -7,11 +7,23 @@ namespace PunchPoint.Core.Models;
 /// </summary>
 public static class PayPeriodLabels
 {
-    public static string Label(PayPeriod period, IReadOnlyList<PayPeriod> allPeriods, DateTime? today = null)
+    /// <summary>Marks the period containing <paramref name="today"/> (used by tests and tools).</summary>
+    public static string Label(PayPeriod period, IReadOnlyList<PayPeriod> allPeriods, DateTime? today)
+        => Label(period, allPeriods, currentPeriodId: null, today);
+
+    public static string Label(PayPeriod period, IReadOnlyList<PayPeriod> allPeriods)
+        => Label(period, allPeriods, currentPeriodId: null, today: null);
+
+    public static string Label(PayPeriod period, IReadOnlyList<PayPeriod> allPeriods,
+        int? currentPeriodId, DateTime? today = null)
     {
         DateTime moment = (today ?? DateTime.Today).Date;
 
-        var current = allPeriods.FirstOrDefault(p => p.Contains(moment));
+        // When two periods cover today (leftover grid after an import), the caller tells us
+        // which one is real. Falling back to "first one containing today" is ambiguous.
+        var current = currentPeriodId is int id
+            ? allPeriods.FirstOrDefault(p => p.Id == id) ?? allPeriods.FirstOrDefault(p => p.Contains(moment))
+            : allPeriods.FirstOrDefault(p => p.Contains(moment));
         var previous = current is null
             ? null
             : allPeriods.Where(p => p.End.Date < current.Start.Date)

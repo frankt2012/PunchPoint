@@ -112,15 +112,14 @@ public sealed class ReportsScreen : ScreenBase
 
     public override void RefreshData()
     {
-        _loadedPeriods = Services.Store.ListPayPeriods().OrderByDescending(p => p.Start).ToList();
+        _loadedPeriods = PeriodPickerList.Build(Services.Store, out var currentPeriod);
         _employees = Services.Store.ListEmployees(includeInactive: true).OrderBy(e => e.SortName).ToList();
 
-        var current = Services.Store.GetCurrentPayPeriod();
-        int periodIndex = current is null ? 0 : Math.Max(0, _loadedPeriods.FindIndex(p => p.Id == current.Id));
+        int periodIndex = currentPeriod is null ? 0 : Math.Max(0, _loadedPeriods.FindIndex(p => p.Id == currentPeriod.Id));
 
         _periods.Items.Clear();
         foreach (var period in _loadedPeriods)
-            _periods.Items.Add(PayPeriodLabels.Label(period, _loadedPeriods));
+            _periods.Items.Add(PayPeriodLabels.Label(period, _loadedPeriods, currentPeriod?.Id));
 
         _employeeFilter.Items.Clear();
         _employeeFilter.Items.Add("All employees");

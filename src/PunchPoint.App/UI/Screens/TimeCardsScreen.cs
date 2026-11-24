@@ -142,7 +142,7 @@ public sealed class TimeCardsScreen : ScreenBase
     {
         bool first = _employees.Count == 0;
         _employees = Services.Store.ListEmployees(includeInactive: true);
-        _periods = Services.Store.ListPayPeriods().OrderByDescending(p => p.Start).ToList();
+        _periods = PeriodPickerList.Build(Services.Store, out var currentPeriod);
 
         _loading = true;
         try
@@ -153,10 +153,9 @@ public sealed class TimeCardsScreen : ScreenBase
 
             _period.Items.Clear();
             foreach (var period in _periods)
-                _period.Items.Add(PayPeriodLabels.Label(period, _periods));
+                _period.Items.Add(PayPeriodLabels.Label(period, _periods, currentPeriod?.Id));
 
-            var current = Services.Store.GetCurrentPayPeriod();
-            int periodIndex = current is null ? 0 : Math.Max(0, _periods.FindIndex(p => p.Id == current.Id));
+            int periodIndex = currentPeriod is null ? 0 : Math.Max(0, _periods.FindIndex(p => p.Id == currentPeriod.Id));
             if (_periods.Count > 0) _period.SelectedIndex = periodIndex;
 
             if (_employee.Items.Count > 0 && (first || _employee.SelectedIndex < 0))

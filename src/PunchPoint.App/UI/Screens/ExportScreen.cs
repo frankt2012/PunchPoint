@@ -104,15 +104,14 @@ public sealed class ExportScreen : ScreenBase
 
     public override void RefreshData()
     {
-        _periodsLoaded = Services.Store.ListPayPeriods().OrderByDescending(p => p.Start).ToList();
+        _periodsLoaded = PeriodPickerList.Build(Services.Store, out var currentPeriod);
         _employees = Services.Store.ListEmployees(includeInactive: true);
 
-        var current = Services.Store.GetCurrentPayPeriod();
-        int index = current is null ? 0 : Math.Max(0, _periodsLoaded.FindIndex(p => p.Id == current.Id));
+        int index = currentPeriod is null ? 0 : Math.Max(0, _periodsLoaded.FindIndex(p => p.Id == currentPeriod.Id));
 
         _periods.Items.Clear();
         foreach (var period in _periodsLoaded)
-            _periods.Items.Add(PayPeriodLabels.Label(period, _periodsLoaded));
+            _periods.Items.Add(PayPeriodLabels.Label(period, _periodsLoaded, currentPeriod?.Id));
 
         if (_periodsLoaded.Count > 0) _periods.SelectedIndex = index;
         RefreshSummary();

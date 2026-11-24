@@ -121,3 +121,21 @@ public class HoursFormatTests
         Assert.Equal("0.73", ReportBuilder.Hours(44, Core.Models.TotalsFormat.Hundredths));
     }
 }
+
+public class PayPeriodLabelIdentityTests
+{
+    [Fact]
+    public void The_named_current_period_wins_when_two_cover_today()
+    {
+        var aligned = new PayPeriod { Id = 10, Start = new DateTime(2026, 11, 18), End = new DateTime(2026, 11, 24) };
+        var stale = new PayPeriod { Id = 11, Start = new DateTime(2026, 11, 24), End = new DateTime(2026, 11, 30) };
+        var previous = new PayPeriod { Id = 9, Start = new DateTime(2026, 11, 11), End = new DateTime(2026, 11, 17) };
+
+        // Ordered like the drop-down (newest first), which is what used to pick the stale one.
+        var all = new[] { stale, aligned, previous };
+
+        Assert.StartsWith("Current · ", PayPeriodLabels.Label(aligned, all, aligned.Id, new DateTime(2026, 11, 24)));
+        Assert.DoesNotContain("Current", PayPeriodLabels.Label(stale, all, aligned.Id, new DateTime(2026, 11, 24)));
+        Assert.StartsWith("Previous · ", PayPeriodLabels.Label(previous, all, aligned.Id, new DateTime(2026, 11, 24)));
+    }
+}
