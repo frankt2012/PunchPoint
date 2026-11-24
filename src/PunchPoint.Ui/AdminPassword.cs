@@ -131,6 +131,7 @@ public static class AdminPassword
             Controls.Add(heading);
             AcceptButton = ok;
             CancelButton = cancel;
+            ActiveControl = _password; // typing must go into the box, not the OK button
 
             ok.Click += (_, _) =>
             {
@@ -148,7 +149,11 @@ public static class AdminPassword
                 Close();
             };
 
-            Shown += (_, _) => _password.Focus();
+            Shown += (_, _) =>
+            {
+                _password.Select();
+                _password.Focus();
+            };
         }
     }
 

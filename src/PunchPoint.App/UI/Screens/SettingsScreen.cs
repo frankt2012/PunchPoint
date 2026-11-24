@@ -12,6 +12,17 @@ public sealed class SettingsScreen : ScreenBase
     private readonly TextBox _message = Theme.Input(520);
     private readonly Label _passwordStatus = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
     private readonly ComboBox _clockMode = Theme.Dropdown(470);
+    private readonly ComboBox _clockSize = Theme.Dropdown(470);
+
+    /// <summary>Window sizes offered for the windowed clock; the clock can also be dragged to any size.</summary>
+    private static readonly (string Label, int Width, int Height)[] ClockSizes =
+    {
+        ("Compact — 640 × 480", 640, 480),
+        ("Small — 800 × 600", 800, 600),
+        ("Standard — 1000 × 720", 1000, 720),
+        ("Large — 1200 × 800", 1200, 800),
+        ("Extra large — 1440 × 900", 1440, 900),
+    };
     private readonly ComboBox _appearance = Theme.Dropdown(200);
 
     private readonly ComboBox _periodType = Theme.Dropdown(200);
@@ -109,7 +120,7 @@ public sealed class SettingsScreen : ScreenBase
         var clockRow = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 10, 0, 0) };
         clockRow.Controls.Add(new Label
         {
-            Text = "Clock window",
+            Text = "Clock &window",
             Width = 300,
             AutoSize = false,
             TextAlign = ContentAlignment.MiddleLeft,
@@ -123,6 +134,47 @@ public sealed class SettingsScreen : ScreenBase
         });
         clockRow.Controls.Add(_clockMode);
         stack.Add(clockRow);
+
+        var sizeRow = new FlowLayoutPanel { FlowDirection = FlowDirection.LeftToRight, AutoSize = true, WrapContents = false, Margin = new Padding(0, 4, 0, 0) };
+        sizeRow.Controls.Add(new Label
+        {
+            Text = "Clock window si&ze",
+            Width = 300,
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new Padding(0, 8, 8, 0),
+            ForeColor = Theme.TextMuted,
+        });
+        sizeRow.Controls.Add(_clockSize);
+        stack.Add(sizeRow);
+        stack.Add(new Label
+        {
+            Text = "Windowed mode only. Dragging the clock's edge overrides this, and the list then shows " +
+                   "\u201cCustom\u201d with the size you chose.",
+            Font = Theme.Small,
+            ForeColor = Theme.TextMuted,
+            AutoSize = true,
+            MaximumSize = new Size(760, 0),
+            Margin = new Padding(0, 2, 0, 0),
+        });
+
+        _clockMode.SelectedIndexChanged += (_, _) => _clockSize.Enabled = _clockMode.SelectedIndex == 0;
+
+        // Choosing a size takes effect straight away on a running clock (it checks every few
+        // seconds), so the supervisor sees the result without restarting anything.
+        _clockSize.SelectedIndexChanged += (_, _) =>
+        {
+            int index = _clockSize.SelectedIndex;
+            if (index < 0 || index >= ClockSizes.Length) return;
+
+            var settings = Services.Store.GetSettings();
+            if (settings.ClockWidth == ClockSizes[index].Width &&
+                settings.ClockHeight == ClockSizes[index].Height) return;
+
+            settings.ClockWidth = ClockSizes[index].Width;
+            settings.ClockHeight = ClockSizes[index].Height;
+            Services.Store.SaveSettings(settings);
+        };
 
         stack.Add(new Label
         {
@@ -610,6 +662,18 @@ public sealed class SettingsScreen : ScreenBase
         _company.Text = s.CompanyName;
         _message.Text = s.CompanyMessage;
         _clockMode.SelectedIndex = s.ClockFullScreen ? 1 : 0;
+
+        _clockSize.Items.Clear();
+        int sizeMatch = -1;
+        for (int i = 0; i < ClockSizes.Length; i++)
+        {
+            _clockSize.Items.Add(ClockSizes[i].Label);
+            if (ClockSizes[i].Width == s.ClockWidth && ClockSizes[i].Height == s.ClockHeight)
+                sizeMatch = i;
+        }
+        _clockSize.Items.Add($"Custom — {s.ClockWidth} × {s.ClockHeight}");
+        _clockSize.SelectedIndex = sizeMatch >= 0 ? sizeMatch : ClockSizes.Length;
+        _clockSize.Enabled = !s.ClockFullScreen;
         _smtpHost.Text = s.SmtpHost;
         _smtpPort.Value = Math.Clamp(s.SmtpPort, 1, 65535);
         _smtpSsl.Checked = s.SmtpUseSsl;
@@ -826,6 +890,12 @@ public sealed class SettingsScreen : ScreenBase
         s.TotalsFormat = _totalsFormat.SelectedIndex == 1 ? TotalsFormat.Minutes : TotalsFormat.Hundredths;
         s.EnableSeventhDayOvertime = _seventhDay.Checked;
         s.ClockFullScreen = _clockMode.SelectedIndex == 1;
+
+        if (_clockSize.SelectedIndex >= 0 && _clockSize.SelectedIndex < ClockSizes.Length)
+        {
+            s.ClockWidth = ClockSizes[_clockSize.SelectedIndex].Width;
+            s.ClockHeight = ClockSizes[_clockSize.SelectedIndex].Height;
+        }
         s.Theme = (AppTheme)Math.Clamp(_appearance.SelectedIndex, 0, 2);
         Fmt.Totals = s.TotalsFormat;
         s.SmtpHost = _smtpHost.Text.Trim();

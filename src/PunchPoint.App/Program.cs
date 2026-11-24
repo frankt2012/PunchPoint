@@ -43,6 +43,9 @@ internal static class Program
             string? tourFolder = ValueOf(args, "--tour");
             string? startScreen = ValueOf(args, "--screen");
 
+            // The clock has just checked the supervisor password; do not ask again.
+            string? launchToken = ValueOf(args, "--launch-token");
+
             var database = dbOverride is null ? Database.OpenDefault() : Database.Open(dbOverride);
             var store = new Store(database);
 
@@ -80,7 +83,8 @@ internal static class Program
                     store.SaveSettings(settings);
                     store.Audit("Supervisor password created", Environment.UserName);
                 }
-                else if (!AdminPassword.Unlock(null, settings.AdminPasswordHash))
+                else if (!LaunchHandoff.Consume(launchToken) &&
+                         !AdminPassword.Unlock(null, settings.AdminPasswordHash))
                 {
                     return;
                 }

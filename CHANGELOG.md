@@ -3,6 +3,25 @@
 What changed in each release, in plain language. Update checks read the newest **published**
 release, so a version stays a draft here until it has been tested on Windows.
 
+## 1.6.7 — 2026-11-24
+
+**Pick the clock's window size, and open PunchPoint from the clock.**
+
+- **Settings → Company → Clock window size** offers Compact (640×480), Small (800×600),
+  Standard (1000×720), Large (1200×800) and Extra large (1440×900). Choosing one resizes a
+  running clock within a few seconds, so you can see the result straight away. Dragging the
+  clock's edge still works and shows as **Custom** with the size you chose.
+- **Supervisor → Open PunchPoint** starts the management app from the clock and closes the
+  clock; start the clock again from PunchPoint when you are done. You type the password once —
+  the clock passes the app a one-time token instead of asking a second time. The chooser is also
+  on **Ctrl+Shift+E**, and its other button closes the clock as before.
+- The clock **no longer takes the keyboard from other programs**. On a shared PC it used to put
+  the cursor back in its PIN box every second, so typing in Word or a browser went into the
+  clock — and four digits could clock someone in or out. It now only takes the keyboard back
+  when it is the window in use.
+- The clock's digits now shrink to fit the card instead of being clipped in a narrow or short
+  window.
+
 ## 1.6.6 — 2026-11-24
 
 **The clock fits a small window.**

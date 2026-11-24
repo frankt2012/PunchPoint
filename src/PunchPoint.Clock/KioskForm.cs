@@ -1,3 +1,5 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
 using PunchPoint.App.UI;
 using PunchPoint.Core.Models;
 using PunchPoint.Core.Services;
@@ -40,6 +42,7 @@ public sealed class KioskForm : Form
     private DateTime _resetAt;
     private bool _allowClose;
     private bool _compact;
+    private Size _appliedSize = Size.Empty;
     private TableLayoutPanel? _root;
     private Control? _clockCard;
     private Control? _recentCard;
@@ -52,10 +55,12 @@ public sealed class KioskForm : Form
     private Control? _clockStack;
     private bool _punching;
     private bool _hasEmployees;
+    private readonly bool _sizeFixed;
     private AppSettings _settings;
 
     public KioskForm(Store store, bool fullScreen, Size? sizeOverride = null)
     {
+        _sizeFixed = sizeOverride is not null;
         _store = store;
         _clock = new ClockService(store);
         _settings = store.GetSettings();
@@ -88,6 +93,8 @@ public sealed class KioskForm : Form
             MaximizeBox = true;
             MinimizeBox = true;
         }
+
+        if (!fullScreen) _appliedSize = Size;
 
         BuildUi();
         _tick.Tick += (_, _) => OnTick();
@@ -127,6 +134,7 @@ public sealed class KioskForm : Form
         clockCard.Margin = new Padding(0, 0, 10, 0);
 
         var clockStack = new StackPanel(2) { Dock = DockStyle.Fill, Padding = new Padding(0) };
+        clockStack.AutoSize = false; // fill the card; otherwise the rows shrink to the clock text
 
         _time.ForeColor = Theme.Text;
         _time.AutoSize = true;
@@ -217,31 +225,91 @@ public sealed class KioskForm : Form
 
         Controls.Add(_root);
 
-        // Supervisor exit for kiosk mode, where there is no title bar. A windowed clock can be
-        // closed with its own X (or Alt+F4), and both ask for the password.
-        if (_fullScreen)
-        {
-            var exit = new Button
-            {
-                Text = "Supervisor",
-                FlatStyle = FlatStyle.Flat,
-                Size = new Size(96, 30),
-                Anchor = AnchorStyles.Top | AnchorStyles.Right,
-                BackColor = Theme.Canvas,
-                ForeColor = Theme.TextFaint,
-                Font = Theme.Small,
-                Cursor = Cursors.Hand,
-                TabStop = false,
-            };
-            exit.FlatAppearance.BorderSize = 0;
-            exit.Location = new Point(ClientSize.Width - 106, 8);
-            exit.Click += (_, _) => SupervisorExit();
-            Controls.Add(exit);
-            exit.BringToFront();
-            Resize += (_, _) => exit.Location = new Point(ClientSize.Width - 106, 8);
-        }
+        // The Supervisor link sits in the clock card's corner: it opens the management app or
+        // closes the clock. The window's own close button and Alt+F4 still close directly.
+        AddSupervisorLink(clockCard);
 
         ApplyLayout();
+    }
+
+    private void AddSupervisorLink(Control clockCard)
+    {
+        var link = new Button
+        {
+            Text = "Supervisor",
+            FlatStyle = FlatStyle.Flat,
+            Size = new Size(94, 26),
+            BackColor = clockCard.BackColor,
+            ForeColor = Theme.TextFaint,
+            Font = Theme.Small,
+            Cursor = Cursors.Hand,
+            TabStop = false,
+        };
+        link.FlatAppearance.BorderSize = 0;
+
+        void Place() => link.Location = new Point(
+            Math.Max(0, clockCard.ClientSize.Width - link.Width - 4), 2);
+
+        link.Click += (_, _) => SupervisorMenu();
+        clockCard.Controls.Add(link);
+        link.BringToFront();
+        clockCard.Resize += (_, _) => Place();
+        Place();
+    }
+
+    private void SupervisorMenu()
+    {
+        switch (SupervisorPrompt.Ask(this))
+        {
+            case SupervisorAction.OpenApp:
+                OpenManagementApp();
+                break;
+            case SupervisorAction.CloseClock:
+                SupervisorExit();
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Starts PunchPoint.exe from the clock. The clock has just checked the password, so it
+    /// hands the app a one-time token instead of making the supervisor type it twice.
+    /// </summary>
+    private void OpenManagementApp()
+    {
+        var settings = _store.GetSettings();
+
+        if (!string.IsNullOrWhiteSpace(settings.AdminPasswordHash) &&
+            !AdminPassword.Unlock(this, settings.AdminPasswordHash,
+                "Enter the supervisor password to open PunchPoint."))
+            return;
+
+        string exe = Path.Combine(AppContext.BaseDirectory, "PunchPoint.exe");
+        if (!File.Exists(exe))
+        {
+            PromptDialog.Warn(this,
+                "PunchPoint.exe is not in the same folder as the clock, so it cannot be started " +
+                "from here.\n\nStart it from the Start menu or its desktop shortcut.");
+            return;
+        }
+
+        try
+        {
+            string token = LaunchHandoff.Create();
+            Process.Start(new ProcessStartInfo(exe, $"--launch-token {token}")
+            {
+                UseShellExecute = false,
+                WorkingDirectory = AppContext.BaseDirectory,
+            });
+        }
+        catch (Exception ex)
+        {
+            PromptDialog.Warn(this, $"PunchPoint could not be started: {ex.Message}");
+            return;
+        }
+
+        _store.Audit("Clock handed over", "PunchPoint opened from the clock");
+        _allowClose = true;
+        Close();
     }
 
     /// <summary>
@@ -304,15 +372,45 @@ public sealed class KioskForm : Form
 
         _root.ResumeLayout();
         PerformLayout();
+        FitTimeType();
+    }
+
+    /// <summary>
+    /// The clock digits shrink until they fit the card: at 58 pt they overflow a narrow
+    /// window, and a clipped time is worse than a smaller one.
+    /// </summary>
+    private void FitTimeType()
+    {
+        // Measure against the card, not the stack: the stack sizes itself to its content, so
+        // using it would chase its own tail and shrink the clock for no reason.
+        if (_clockCard is not Control card) return;
+
+        int available = card.ClientSize.Width - card.Padding.Horizontal;
+        if (available < 80) return;
+
+        // The card has to fit the time, the date and the company message, so the height caps
+        // the size too - otherwise a short window shows the clock and clips everything else.
+        int heightAvailable = card.ClientSize.Height - card.Padding.Vertical;
+        int reserved = _date.PreferredHeight + _date.Margin.Vertical
+                     + _message.PreferredHeight + _message.Margin.Vertical
+                     + 8;
+        if (_feedback.Visible) reserved += _feedback.PreferredHeight + _feedback.Margin.Vertical;
+        float byHeight = Math.Max(18f, (heightAvailable - reserved) / 1.55f);
+
+        float size = _fullScreen ? 58f : Math.Min(58f, Math.Min(available / 7.2f, byHeight));
+        while (size > 20f)
+        {
+            using var font = new Font(Theme.Family, size, FontStyle.Bold);
+            if (TextRenderer.MeasureText(_time.Text, font).Width <= available) break;
+            size -= 2f;
+        }
+
+        if (Math.Abs(_time.Font.Size - size) < 0.5f) return;
+        _time.Font = new Font(Theme.Family, size, FontStyle.Bold);
     }
 
     private void ScaleType(bool compact)
     {
-        float timeSize = !_fullScreen && compact
-            ? Math.Clamp(ClientSize.Width / 17f, 28f, 46f)
-            : 58f;
-
-        _time.Font = new Font(Theme.Family, timeSize, FontStyle.Bold);
         _date.Font = new Font(Theme.Family, compact ? 10.5f : 13f);
         _message.Font = new Font(Theme.Family, compact ? 9.5f : 11f, FontStyle.Italic);
         _feedback.Font = new Font(Theme.Family, compact ? 11f : 13f, FontStyle.Bold);
@@ -402,7 +500,7 @@ public sealed class KioskForm : Form
     protected override void OnShown(EventArgs e)
     {
         base.OnShown(e);
-        BeginInvoke(new Action(DumpLayout));
+        if (IsHandleCreated) BeginInvoke(new Action(DumpLayout));
     }
 
     protected override void OnResize(EventArgs e)
@@ -414,7 +512,7 @@ public sealed class KioskForm : Form
         bool compact = ClientSize.Width < 760;
         if (compact != _compact) ApplyLayout();
         else if (!compact) _time.Font = new Font(Theme.Family, 58f, FontStyle.Bold);
-        BeginInvoke(new Action(DumpLayout));
+        if (IsHandleCreated) BeginInvoke(new Action(DumpLayout));
     }
 
     private void BuildPinPanel()
@@ -699,6 +797,7 @@ public sealed class KioskForm : Form
     {
         var now = DateTime.Now;
         _time.Text = now.ToString("h:mm:ss tt");
+        FitTimeType();
         _date.Text = now.ToString("dddd, MMMM d, yyyy");
 
         _hasEmployees = _store.ListEmployees(includeInactive: false).Count > 0;
@@ -712,15 +811,37 @@ public sealed class KioskForm : Form
             _countdown.Text = $"Returns to the PIN screen in {seconds}s";
             if (seconds <= 0) Reset();
         }
-        else if (Visible && _pinPanel.Visible && !_pin.Focused)
+        else if (Visible && _pinPanel.Visible && !_pin.Focused && IsForegroundWindow)
         {
+            // Only take the keyboard back when the clock is the window the operator is using.
+            // Without this check the clock stole focus from other programs every second: typing
+            // in Word would land in the PIN box, and four digits could clock someone in.
             _pin.Focus();
         }
+    }
+
+    /// <summary>
+    /// Picks up a new window size chosen in Settings without restarting the clock. Dragging the
+    /// window is untouched: that only writes to the settings when the clock closes.
+    /// </summary>
+    private void ApplySettingsSize()
+    {
+        if (_fullScreen || _sizeFixed || !IsHandleCreated) return;
+
+        var size = new Size(
+            Math.Clamp(_settings.ClockWidth, 640, 2400),
+            Math.Clamp(_settings.ClockHeight, 480, 1600));
+
+        if (size == _appliedSize) return;
+
+        _appliedSize = size;
+        if (WindowState == FormWindowState.Normal && Size != size) Size = size;
     }
 
     private void RefreshRecent()
     {
         _settings = _store.GetSettings();
+        ApplySettingsSize();
         var employees = _store.ListEmployees(includeInactive: true).ToDictionary(e => e.Id);
         var punches = _store
             .ListPunches(DateTime.Today.AddDays(-1), DateTime.Now.AddHours(1))
@@ -818,12 +939,17 @@ public sealed class KioskForm : Form
         base.OnFormClosing(e);
     }
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
+
+    private bool IsForegroundWindow => GetForegroundWindow() == Handle;
+
     protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
     {
-        // Ctrl+Shift+E is the discreet supervisor shortcut.
+        // Ctrl+Shift+E is the discreet supervisor shortcut (same menu as the corner link).
         if (keyData == (Keys.Control | Keys.Shift | Keys.E))
         {
-            SupervisorExit();
+            SupervisorMenu();
             return true;
         }
 

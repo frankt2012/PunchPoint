@@ -12,7 +12,8 @@ PunchPoint is two programs:
   mode, the **Supervisor** button in the top-right corner).
 
   The windowed clock can be resized by dragging its edge, down to 640×480, and it remembers
-  the size you leave it at. Below about 760 px wide it rearranges into a single column — clock
+  the size you leave it at. Settings → Company → **Clock window size** has ready-made sizes
+  (Compact 640×480 up to Extra large 1440×900) that apply to a running clock at once. Below about 760 px wide it rearranges into a single column — clock
   on top, PIN pad below — and hides the recent-activity list so the keys stay large enough to
   tap.
 * **PunchPoint.exe** — the management app. It asks for the supervisor password every time
