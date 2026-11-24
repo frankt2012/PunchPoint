@@ -210,6 +210,8 @@ public sealed class DashboardScreen : ScreenBase
                 _grid.Rows[_grid.Rows.Count - 1].Cells[1].Style.ForeColor = Theme.Success;
         }
 
+        _grid.ClearSelection();
+
         _clockedInValue.Text = clockedIn.ToString();
         _clockedOutValue.Text = clockedOut.ToString();
         _hoursValue.Text = Fmt.Hours(totalMinutes);

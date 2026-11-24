@@ -6,6 +6,22 @@ and punches.
 
 ![PunchPoint](docs/icon-preview.png)
 
+**Windows 11 · x64 and ARM64 · MIT · self-contained (no .NET to install)**
+[Latest release](../../releases/latest) · [What's new](CHANGELOG.md) · [User guide](docs/user-guide.md)
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![Punch Editing](docs/screenshots/punch-editing.png) |
+| **Dashboard** — who is on the clock, hours this period, punch problems, at a glance. | **Punch Editing** — one employee, one period, every punch with day totals and approval. |
+| ![Reports](docs/screenshots/reports.png) | ![Settings](docs/screenshots/settings.png) |
+| **Reports** — eleven reports with period and employee filters; preview, print, PDF or CSV. | **Settings** — company rules, clock window, shifts, holidays, email, updates and backups. |
+
+Dark mode follows Windows or can be forced on — the employee clock uses the same setting:
+
+![Dashboard in dark mode](docs/screenshots/dashboard-dark.png)
+
 ## Why
 
 timeQplus v3 (2012) depends on components Windows 11 no longer ships — 32-bit JET/MDAC
@@ -66,11 +82,12 @@ self-contained executable with no runtime to install.
 | **Punch Editing** | Per-employee, per-period punches, corrections, totals, approval |
 | **Punches** | Every raw clock event, editable, with audit trail |
 | **Import** | Reads timeQplus `arx_active.mdb` directly; previews before writing |
-| **Reports** | Ten reports with preview, print and CSV export |
+| **Reports** | Eleven reports with preview, print, PDF and CSV export, including **Attendance** (late, early outs, absences) |
 | **Export** | Payroll, generic ASCII, daily detail, punches, QuickBooks-friendly files, PDF |
 | **Email** | Payroll summary PDF when a pay period ends, optionally a time card to each employee |
 | **Updates** | Daily check of GitHub releases with notes and a download link, no silent installs |
-| **Settings** | Pay periods, rounding, overtime, day-change, shifts, holidays, appearance, backups |
+| **Backups** | One automatic backup a day, newest 14 kept, optional copy to Google Drive / OneDrive / Dropbox / a network folder |
+| **Settings** | Pay periods, rounding, overtime, day-change, shifts, holidays, appearance, clock exit password, backups |
 
 ## Two programs
 

@@ -179,6 +179,7 @@ public sealed class ReportsScreen : ScreenBase
 
         _grid.Rows.Clear();
         _grid.Columns.Clear();
+        _grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.DisplayedCells;
 
         if (_table is null)
         {

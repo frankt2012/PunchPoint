@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using PunchPoint.Core.Import;
@@ -32,6 +33,7 @@ public static class Program
                 "pdf" => Pdf(args[1..]),
                 "update" => Update(args[1..]),
                 "report" => Report(args[1..]),
+                "tour" => Tour(args[1..]),
                 "help" or "-h" or "--help" => Usage(),
                 _ => Unknown(args[0]),
             };
@@ -71,6 +73,10 @@ public static class Program
                 --no-settings           Do not copy company rules
                 --misc-hours            Import transactions that carry hours (vacation etc.)
                 --reset                 Delete the target database first
+
+            Screenshots
+              punchpoint tour [host:port] [--db <file>]
+              Seeds demo data, runs the app's screenshot tour in dark and light, uploads the PNGs.
 
             Reports
               punchpoint report [name] [--db <file>] [--period <n>]   Print a report as text
@@ -411,6 +417,120 @@ public static class Program
 
     private static string Fmt(int minutes) => (minutes / 60.0).ToString("0.00");
 
+    /// <summary>
+    /// Produces the screenshots used on the project page: seeds demo data into a scratch
+    /// database, runs PunchPoint's built-in tour twice (dark and light) and PUTs every PNG to
+    /// the given host, so nothing has to be copied out of the machine by hand.
+    /// </summary>
+    private static int Tour(string[] args)
+    {
+        string host = "192.168.180.1:8899";
+        string dbPath = Path.Combine(Path.GetTempPath(), "punchpoint-tour.db");
+        string? dbArg = null;
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            if (args[i] == "--db") dbArg = args[++i];
+            else if (!args[i].StartsWith("--")) host = args[i];
+        }
+
+        if (dbArg is not null) dbPath = dbArg;
+
+        // A clean scratch database with the demo shop and ten days of punches.
+        foreach (string suffix in new[] { "", "-wal", "-shm" })
+        {
+            try { File.Delete(dbPath + suffix); } catch { }
+        }
+
+        using (var database = Database.Open(dbPath))
+        {
+            var store = new Store(database);
+            DemoSeed(store);
+        }
+
+        string app = FindApp();
+        if (app.Length == 0)
+        {
+            Console.Error.WriteLine("PunchPoint.exe not found next to this tool or in Program Files.");
+            return 1;
+        }
+
+        foreach (var (theme, folder) in new[]
+                 {
+                     ("dark", Path.Combine(Path.GetTempPath(), "pp-shots-dark")),
+                     ("light", Path.Combine(Path.GetTempPath(), "pp-shots-light")),
+                 })
+        {
+            try { Directory.Delete(folder, recursive: true); } catch { }
+
+            foreach (var process in Process.GetProcessesByName("PunchPoint"))
+            {
+                try { process.Kill(); } catch { }
+            }
+
+            Console.WriteLine($"Capturing {theme}…");
+
+            var start = new ProcessStartInfo(app)
+            {
+                UseShellExecute = false,
+                WorkingDirectory = Path.GetDirectoryName(app)!,
+            };
+            start.ArgumentList.Add("--tour");
+            start.ArgumentList.Add(folder);
+            start.ArgumentList.Add("--db");
+            start.ArgumentList.Add(dbPath);
+            start.ArgumentList.Add("--theme");
+            start.ArgumentList.Add(theme);
+
+            using var tour = Process.Start(start);
+            tour?.WaitForExit(180_000);
+
+            Upload(folder, theme, host);
+        }
+
+        Console.WriteLine("Screenshots uploaded.");
+        return 0;
+    }
+
+    private static void Upload(string folder, string theme, string host)
+    {
+        if (!Directory.Exists(folder))
+        {
+            Console.WriteLine($"  nothing captured in {folder}");
+            return;
+        }
+
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+
+        foreach (string file in Directory.GetFiles(folder, "*.png").OrderBy(f => f))
+        {
+            string name = System.IO.Path.GetFileNameWithoutExtension(file);
+            string target = $"http://{host}/{theme}-{name}.png";
+
+            try
+            {
+                using var content = new ByteArrayContent(File.ReadAllBytes(file));
+                content.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+                var response = http.PutAsync(target, content).GetAwaiter().GetResult();
+                Console.WriteLine($"  {name}: {(int)response.StatusCode}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"  {name}: {ex.Message}");
+            }
+        }
+    }
+
+    private static string FindApp()
+    {
+        string beside = Path.Combine(AppContext.BaseDirectory, "PunchPoint.exe");
+        if (File.Exists(beside)) return beside;
+
+        string programFiles = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "PunchPoint", "PunchPoint.exe");
+        return File.Exists(programFiles) ? programFiles : "";
+    }
+
     private static int Report(string[] args)
     {
         string name = args.Length > 0 && !args[0].StartsWith("--") ? args[0] : "attendance";
@@ -624,13 +744,22 @@ public static class Program
 
         using var database = dbPath is null ? Database.OpenDefault() : Database.Open(dbPath);
         var store = new Store(database);
-        var clock = new ClockService(store);
 
         if (store.ListEmployees(includeInactive: true).Count > 0)
         {
             Console.WriteLine("Database already has employees; not seeding demo data.");
             return 0;
         }
+
+        DemoSeed(store, todayOnly);
+        Console.WriteLine("Seeded demo data");
+        return 0;
+    }
+
+    /// <summary>The demo shop used by both "demo" and "tour": four people, ten days of punches.</summary>
+    private static void DemoSeed(Store store, bool todayOnly = false)
+    {
+        var clock = new ClockService(store);
 
         var settings = store.GetSettings();
         settings.CompanyName = "Northwind Print Shop";
@@ -697,10 +826,9 @@ public static class Program
             store.UpsertPayPeriod(p);
         }
 
-        Console.WriteLine($"Seeded demo data into {database.Path}");
-        Console.WriteLine($"  {store.ListEmployees().Count} employees, {store.CountPunches()} punches");
-        return 0;
+        Console.WriteLine($"  {store.ListEmployees(includeInactive: true).Count} employees, {store.CountPunches()} punches");
     }
+
 
     // =================================================================
     // Formatting helpers
