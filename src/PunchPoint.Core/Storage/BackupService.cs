@@ -25,7 +25,7 @@ public static class BackupService
 
         if (!exists)
         {
-            created = store.Db.Backup();
+            created = store.Db.Backup(timestamp: now);
 
             settings.LastBackupPath = created;
             store.SaveSettings(settings);

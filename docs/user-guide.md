@@ -25,6 +25,28 @@ Settings → *Start the clock automatically* makes Windows launch the clock at s
 Leave the clock running on the work PC. Employees cannot reach employees, time cards,
 imports or settings from it — those only exist in the password-protected app.
 
+## Installing on several PCs (unattended)
+
+The setup can run with no windows or prompts, which is handy for a lab, a scripted rollout, or
+a remote session:
+
+```
+PunchPoint-Setup-1.6.8.exe /S /LOG=C:\Temp\punchpoint-setup.log
+```
+
+| Switch | Meaning |
+|---|---|
+| `/S` | Silent: no windows, no prompts |
+| `/D=C:\Path` | Install folder (default `C:\Program Files\PunchPoint`) |
+| `/LOG=C:\path` | Where to write the log (default `%TEMP%\PunchPoint-Setup.log`) |
+| `/NODESKTOP` | Do not create desktop shortcuts |
+| `/AUTOSTART` | Start the employee clock when the user signs in |
+| `/START` | Open PunchPoint when setup finishes |
+
+Exit code **0** means success, **1** a failed install (the log says why) and **2** that it was not
+run as administrator. Silent installs never touch `C:\ProgramData\PunchPoint`, so existing time
+records are safe, exactly like the normal installer.
+
 ## Every day
 
 **Employees clock in and out on the Clock screen.** They type their PIN and press

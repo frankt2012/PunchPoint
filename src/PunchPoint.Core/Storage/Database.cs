@@ -120,12 +120,16 @@ public sealed class Database : IDisposable
     }
 
     /// <summary>Copies the database (and its WAL) to a timestamped backup file.</summary>
-    public string Backup(string? destinationDirectory = null)
+    /// <summary>
+    /// Writes a consistent copy of the database. <paramref name="timestamp"/> lets the caller
+    /// name the file with the same clock it uses for the "one backup per day" check.
+    /// </summary>
+    public string Backup(string? destinationDirectory = null, DateTime? timestamp = null)
     {
         string dir = destinationDirectory ?? AppPaths.BackupsDirectory;
         Directory.CreateDirectory(dir);
 
-        string baseName = $"{System.IO.Path.GetFileNameWithoutExtension(Path)}-{DateTime.Now:yyyyMMdd-HHmmss}";
+        string baseName = $"{System.IO.Path.GetFileNameWithoutExtension(Path)}-{(timestamp ?? DateTime.Now):yyyyMMdd-HHmmss}";
         string target = System.IO.Path.Combine(dir, baseName + ".db");
 
         // Two launches inside the same second must not collide.

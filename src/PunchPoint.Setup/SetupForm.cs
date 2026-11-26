@@ -23,28 +23,72 @@ internal static class Program
     }
 
     [STAThread]
-    static void Main()
+    static int Main(string[] args)
     {
+        var options = SetupOptions.Parse(args);
+
         Application.SetHighDpiMode(HighDpiMode.PerMonitorV2);
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
         Application.SetDefaultFont(Theme.Body);
 
-        if (!IsAdministrator())
+        bool admin = IsAdministrator();
+
+        if (options.Silent)
+        {
+            // Unattended: no windows, no prompts, one log file and a meaningful exit code.
+            options = options with { LogPath = options.LogPath ?? Path.Combine(Path.GetTempPath(), "PunchPoint-Setup.log") };
+            try
+            {
+                // Start with a BOM so PowerShell and Notepad show non-ASCII text correctly.
+                File.WriteAllText(options.LogPath, "", new System.Text.UTF8Encoding(true));
+            }
+            catch
+            {
+                // A read-only %TEMP% is unusual; carry on without the log.
+                options = options with { LogPath = null };
+            }
+
+            SetupLog.Write(options.LogPath, $"PunchPoint Setup {Version} (silent)");
+            SetupLog.Write(options.LogPath, $"target={options.Target ?? "(default)"} desktop={options.DesktopIcons} autostart={options.AutoStart} start={options.StartAfter}");
+
+            if (!admin)
+            {
+                SetupLog.Write(options.LogPath, "FAILED: administrator rights are required.");
+                return 2;
+            }
+
+            try
+            {
+                using var form = new SetupForm(options);
+                bool ok = form.InstallSilently();
+                SetupLog.Write(options.LogPath, ok ? "SUCCESS" : "FAILED");
+                return ok ? 0 : 1;
+            }
+            catch (Exception ex)
+            {
+                SetupLog.Write(options.LogPath, "FAILED: " + ex);
+                return 1;
+            }
+        }
+
+        if (!admin)
         {
             MessageBox.Show("Setup needs administrator rights to install into Program Files.",
                 ProductName, MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            return;
+            return 2;
         }
 
         try
         {
-            Application.Run(new SetupForm());
+            Application.Run(new SetupForm(options));
+            return 0;
         }
         catch (Exception ex)
         {
             MessageBox.Show("Setup could not finish:\r\n\r\n" + ex.Message,
                 ProductName + " Setup", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return 1;
         }
     }
 
@@ -56,7 +100,100 @@ internal static class Program
     }
 }
 
-public sealed class SetupForm : Form
+/// <summary>Where setup writes its progress when nobody is watching.</summary>
+internal static class SetupLog
+{
+    public static void Write(string? path, string message)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return;
+
+        try
+        {
+            File.AppendAllText(path, $"{DateTime.Now:yyyy-MM-dd HH:mm:ss}  {message}\r\n");
+        }
+        catch
+        {
+            // Logging must never break the install.
+        }
+    }
+}
+
+/// <summary>
+/// Command line for unattended installs:
+///   PunchPoint-Setup-x.y.z.exe /S [/D=C:\Path] [/LOG=C:\path] [/NODESKTOP] [/AUTOSTART] [/START]
+/// </summary>
+internal sealed record SetupOptions
+{
+    public bool Silent { get; init; }
+    public string? Target { get; init; }
+    public bool DesktopIcons { get; init; } = true;
+    public bool AutoStart { get; init; }
+    public bool StartAfter { get; init; }
+    public string? LogPath { get; init; }
+
+    public static SetupOptions Parse(string[] args)
+    {
+        var options = new SetupOptions();
+        bool silent = false;
+        string? target = null, log = null;
+        bool desktop = true, autostart = false, start = false;
+
+        foreach (string raw in args)
+        {
+            string arg = raw.Trim();
+            if (arg.Length == 0) continue;
+
+            switch (arg.ToLowerInvariant())
+            {
+                case "/s":
+                case "/silent":
+                case "--silent":
+                case "/quiet":
+                case "--quiet":
+                case "/verysilent":
+                    silent = true;
+                    break;
+                case "/nodesktop":
+                case "/nodesktopicons":
+                case "--no-desktop-icons":
+                    desktop = false;
+                    break;
+                case "/autostart":
+                    autostart = true;
+                    break;
+                case "/start":
+                    start = true;
+                    break;
+                default:
+                    if (Prefix(arg, "/d=", "--dir=", "/dir=", "--target=")) target = ValueOf(arg);
+                    else if (Prefix(arg, "/log=", "--log=")) log = ValueOf(arg);
+                    break;
+            }
+        }
+
+        return options with
+        {
+            Silent = silent,
+            Target = string.IsNullOrWhiteSpace(target) ? null : target,
+            DesktopIcons = desktop,
+            AutoStart = autostart,
+            StartAfter = start,
+            LogPath = string.IsNullOrWhiteSpace(log) ? null : log,
+        };
+    }
+
+    private static bool Prefix(string arg, params string[] prefixes) =>
+        prefixes.Any(p => arg.StartsWith(p, StringComparison.OrdinalIgnoreCase));
+
+    private static string ValueOf(string arg)
+    {
+        int at = arg.IndexOf('=');
+        string value = at < 0 ? "" : arg[(at + 1)..].Trim();
+        return value.Trim('"');
+    }
+}
+
+internal sealed class SetupForm : Form
 {
     private const string UninstallKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PunchPoint";
 
@@ -69,8 +206,12 @@ public sealed class SetupForm : Form
     private readonly Button _install;
     private readonly Button _close;
 
-    public SetupForm()
+    private readonly SetupOptions _options;
+    private bool _installOk;
+
+    public SetupForm(SetupOptions? options = null)
     {
+        _options = options ?? new SetupOptions();
         Text = "PunchPoint Setup";
         StartPosition = FormStartPosition.CenterScreen;
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -204,6 +345,36 @@ public sealed class SetupForm : Form
 
         AcceptButton = _install;
         CancelButton = _close;
+
+        if (!string.IsNullOrWhiteSpace(_options.Target)) _path.Text = _options.Target;
+        _desktop.Checked = _options.DesktopIcons;
+        _startWithWindows.Checked = _options.AutoStart;
+        _startNow.Checked = _options.StartAfter;
+    }
+
+    /// <summary>Runs the install with no window or prompts; used by /S.</summary>
+    public bool InstallSilently()
+    {
+        InstallCore(silent: true);
+        return _installOk;
+    }
+
+    private void Log(string message) => SetupLog.Write(_options.LogPath, message);
+
+    private void LogInstalledFiles(string target)
+    {
+        foreach (string name in new[] { "PunchPoint.exe", "PunchPointClock.exe" })
+        {
+            string path = Path.Combine(target, name);
+            if (!File.Exists(path))
+            {
+                Log("MISSING " + path);
+                continue;
+            }
+
+            var info = FileVersionInfo.GetVersionInfo(path);
+            Log($"{name}: version {info.ProductVersion}, {new FileInfo(path).Length:N0} bytes");
+        }
     }
 
     private void Browse()
@@ -220,9 +391,18 @@ public sealed class SetupForm : Form
 
     private void Install()
     {
+        InstallCore(silent: false);
+        if (_installOk) Close();
+    }
+
+    private void InstallCore(bool silent)
+    {
+        _installOk = false;
+
         string target = _path.Text.Trim();
         if (target.Length == 0)
         {
+            if (silent) { Log("FAILED: no install folder given."); return; }
             PromptDialog.Warn(this, "Choose an install folder.");
             return;
         }
@@ -231,6 +411,7 @@ public sealed class SetupForm : Form
         {
             _install.Enabled = false;
             _close.Enabled = false;
+            Log("install folder: " + target);
             CloseRunningPrograms();
 
             Directory.CreateDirectory(target);
@@ -238,6 +419,7 @@ public sealed class SetupForm : Form
             ExtractPayload(target);
 
             VerifyInstalledVersion(target);
+            LogInstalledFiles(target);
 
             SetStatus("Creating shortcuts…", 60);
             CreateShortcuts(target);
@@ -252,30 +434,20 @@ public sealed class SetupForm : Form
 
             SetStatus("Installed.", 100);
 
-            string message = $"PunchPoint {Application.ProductVersion.Split('+')[0]} is installed.\r\n\r\n" +
-                             "The first time you start it you will create the supervisor password.\r\n" +
-                             "Your existing data folder was left untouched.";
+            _installOk = true;
+            Log($"installed PunchPoint {Program.Version} to {target}");
 
-            if (PromptDialog.Confirm(this, message + "\r\n\r\nOpen the folder now?"))
-                Process.Start("explorer.exe", target);
-
-            if (_startNow.Checked)
+            if (!silent)
             {
-                string app = Path.Combine(target, "PunchPoint.exe");
-                if (File.Exists(app))
-                {
-                    // Launch through Explorer so the app runs with the logged-on user's token.
-                    // Starting it directly would inherit this installer's administrator token;
-                    // the app would then create or open the database as Administrator and the
-                    // employee clock (running as the user) could no longer write to it.
-                    Process.Start(new ProcessStartInfo("explorer.exe", $"\"{app}\"")
-                    {
-                        UseShellExecute = true,
-                    });
-                }
+                string message = $"PunchPoint {Application.ProductVersion.Split('+')[0]} is installed.\r\n\r\n" +
+                                 "The first time you start it you will create the supervisor password.\r\n" +
+                                 "Your existing data folder was left untouched.";
+
+                if (PromptDialog.Confirm(this, message + "\r\n\r\nOpen the folder now?"))
+                    Process.Start("explorer.exe", target);
             }
 
-            Close();
+            if (_startNow.Checked) LaunchApp(target);
         }
         catch (Exception ex)
         {
@@ -283,14 +455,42 @@ public sealed class SetupForm : Form
             _close.Enabled = true;
             _progress.Value = 0;
             SetStatus("Install failed.", 0);
+            Log("FAILED: " + ex);
+
+            if (silent) return;
+
             PromptDialog.Warn(this,
                 "The installation did not finish:\r\n\r\n" + ex.Message +
                 "\r\n\r\nIf PunchPoint or the clock is running, close it and try again.");
         }
     }
 
+    /// <summary>
+    /// Launch through Explorer so the app runs with the logged-on user's token. Starting it
+    /// directly would give it this installer's administrator token, and the database would end
+    /// up owned by Administrator, which the employee clock (running as the user) cannot write.
+    /// </summary>
+    private static void LaunchApp(string target)
+    {
+        string app = Path.Combine(target, "PunchPoint.exe");
+        if (!File.Exists(app)) return;
+
+        try
+        {
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{app}\"")
+            {
+                UseShellExecute = true,
+            });
+        }
+        catch
+        {
+            // Starting the app is a convenience, never part of a successful install.
+        }
+    }
+
     private void SetStatus(string text, int percent)
     {
+        Log(text);
         _status.Text = text;
         _progress.Value = Math.Clamp(percent, 0, 100);
         Application.DoEvents();

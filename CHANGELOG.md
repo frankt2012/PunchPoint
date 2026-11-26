@@ -3,6 +3,20 @@
 What changed in each release, in plain language. Update checks read the newest **published**
 release, so a version stays a draft here until it has been tested on Windows.
 
+## 1.6.8 — 2026-11-26
+
+**Unattended install.**
+
+- The setup can now run without any windows or prompts, which is what you want for installing
+  on several PCs from a script, or for automated testing:
+  `PunchPoint-Setup-1.6.8.exe /S` installs to `C:\Program Files\PunchPoint` with desktop
+  shortcuts and no autostart.
+- Options: `/D=C:\Path` install folder, `/LOG=C:\path` log file (default
+  `%TEMP%\PunchPoint-Setup.log`), `/NODESKTOP` no shortcuts, `/AUTOSTART` start the clock at
+  sign-in, `/START` open PunchPoint afterwards.
+- It returns exit code 0 on success, 1 on failure and 2 when it is not running as
+  administrator, and the log records the installed versions. Interactive installs are unchanged.
+
 ## 1.6.7 — 2026-11-24
 
 **Pick the clock's window size, and open PunchPoint from the clock.**

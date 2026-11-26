@@ -10,30 +10,37 @@ namespace PunchPoint.Core.Storage;
 /// </summary>
 public static class LaunchHandoff
 {
-    private static string TokenPath => Path.Combine(AppPaths.DataDirectory, "admin-launch.tmp");
+    private static string TokenPath(string? folder) =>
+        Path.Combine(folder ?? AppPaths.DataDirectory, "admin-launch.tmp");
 
     private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(2);
 
-    /// <summary>Creates a token, stores it and returns it for the command line.</summary>
-    public static string Create()
+    /// <summary>
+    /// Creates a token, stores it and returns it for the command line. The folder is only
+    /// overridden by tests; the programs use the data folder.
+    /// </summary>
+    public static string Create(string? folder = null)
     {
-        AppPaths.EnsureDataDirectory();
+        if (folder is null) AppPaths.EnsureDataDirectory();
+
         string token = Guid.NewGuid().ToString("N");
-        File.WriteAllText(TokenPath, token + "\n" + DateTime.UtcNow.Ticks);
+        File.WriteAllText(TokenPath(folder), token + "\n" + DateTime.UtcNow.Ticks);
         return token;
     }
 
     /// <summary>True when the token matches one this machine created in the last two minutes.</summary>
-    public static bool Consume(string? token)
+    public static bool Consume(string? token, string? folder = null)
     {
         if (string.IsNullOrWhiteSpace(token)) return false;
 
+        string path = TokenPath(folder);
+
         try
         {
-            if (!File.Exists(TokenPath)) return false;
+            if (!File.Exists(path)) return false;
 
-            string[] lines = File.ReadAllLines(TokenPath);
-            File.Delete(TokenPath); // single use, whatever happens
+            string[] lines = File.ReadAllLines(path);
+            File.Delete(path); // single use, whatever happens
 
             if (lines.Length < 2) return false;
             if (!long.TryParse(lines[1], out long ticks)) return false;
