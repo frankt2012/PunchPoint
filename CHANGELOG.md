@@ -5,6 +5,21 @@ release, so a version stays a draft here until it has been tested on Windows.
 
 ## 1.6.8 — 2026-11-26
 
+**Punch direction repairs itself when a punch is added.**
+
+- When someone forgets to clock in and presses the clock at the end of the day, the clock has to
+  record an IN — it cannot know an OUT was meant. Adding the missing punch now **re-types the
+  rest of that day** so it alternates IN, OUT, IN, OUT. The same happens for two OUTs, and when
+  a punch is edited or deleted. Before this, the extra punch stayed wrong and the day's hours
+  were silently lost.
+- **Punch Editing → Fix in/out** repairs a whole period at once for the selected employee, after
+  asking. It only changes punches that break the alternation, so a clean period is untouched,
+  and it lists every change it makes. Break punches and paid-hours entries are never touched.
+- The status line at the bottom of Punch Editing reports what was corrected
+  ("re-typed 4:59 PM IN → OUT"), and each repair is written to the activity log.
+- For scripts: `punchpoint fix-sequence [--db file] [--employee PIN] [--from d] [--to d] [--apply]`
+  shows what would change, and writes only with `--apply`.
+
 **Unattended install.**
 
 - The setup can now run without any windows or prompts, which is what you want for installing

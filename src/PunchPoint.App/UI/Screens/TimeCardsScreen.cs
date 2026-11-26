@@ -2,6 +2,7 @@ using PunchPoint.App.UI;
 using PunchPoint.Core.Export;
 using PunchPoint.Core.Models;
 using PunchPoint.Core.TimeCalc;
+using PunchPoint.Core.TimeCalc;
 
 namespace PunchPoint.App.UI.Screens;
 
@@ -18,6 +19,7 @@ public sealed class TimeCardsScreen : ScreenBase
     private readonly Label _status = new() { AutoSize = true, Font = Theme.Small, ForeColor = Theme.TextMuted };
     private readonly Button _approve = Theme.PrimaryButton("Approve", 120);
     private readonly Button _delete = Theme.SecondaryButton("Delete", 90);
+    private string _sequenceNote = "";
     private readonly Button _edit = Theme.SecondaryButton("Edit", 90);
 
     private List<Employee> _employees = new();
@@ -43,9 +45,14 @@ public sealed class TimeCardsScreen : ScreenBase
         Actions.Controls.Add(add);
 
         var print = Theme.SecondaryButton("Print", 70);
-        print.Margin = new Padding(0, 5, 0, 0);
+        print.Margin = new Padding(0, 5, 6, 0);
         print.Click += (_, _) => PrintTimeCard();
         Actions.Controls.Add(print);
+
+        var fix = Theme.SecondaryButton("Fix in/out", 100);
+        fix.Margin = new Padding(0, 5, 0, 0);
+        fix.Click += (_, _) => FixSequence();
+        Actions.Controls.Add(fix);
 
         var layout = new TableLayoutPanel
         {
@@ -274,9 +281,11 @@ public sealed class TimeCardsScreen : ScreenBase
             $"Other {HoursText(other)}";
 
         var issues = result.Issues.Count;
+        string note = _sequenceNote.Length > 0 ? " · " + _sequenceNote : "";
+
         _status.Text = issues == 0
-            ? $"{punches.Count} punches · no problems detected"
-            : $"{punches.Count} punches · {issues} issue(s) need attention (orange dates)";
+            ? $"{punches.Count} punches · no problems detected{note}"
+            : $"{punches.Count} punches · {issues} issue(s) need attention (orange dates){note}";
         _status.ForeColor = issues == 0 ? Theme.TextMuted : Theme.Warning;
 
         _approve.Text = card?.Approved == true ? "Approved ✓" : "Approve";
@@ -313,6 +322,7 @@ public sealed class TimeCardsScreen : ScreenBase
         using var dialog = new PunchEditDialog(Services, employee, null);
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
+            _sequenceNote = Describe(dialog.SequenceChanges);
             Services.NotifyDataChanged();
             RefreshData();
         }
@@ -327,6 +337,7 @@ public sealed class TimeCardsScreen : ScreenBase
         using var dialog = new PunchEditDialog(Services, employee, punch);
         if (dialog.ShowDialog(this) == DialogResult.OK)
         {
+            _sequenceNote = Describe(dialog.SequenceChanges);
             Services.NotifyDataChanged();
             RefreshData();
         }
@@ -344,9 +355,53 @@ public sealed class TimeCardsScreen : ScreenBase
 
         Services.Store.DeletePunch(punch.Id);
         Services.Store.Audit("Punch deleted", $"{employee.DisplayName} {punch.Timestamp:g}");
+
+        _sequenceNote = Describe(PunchSequence.NormalizeAround(
+            Services.Store, employee, punch.Timestamp, Services.Settings.DayChangeOffsetMinutes));
+
         Services.NotifyDataChanged();
         RefreshData();
     }
+
+    /// <summary>
+    /// Repairs days with two INs or two OUTs (usually a missed punch that was entered later).
+    /// Only punches that break the in/out alternation change, so a clean period is untouched.
+    /// </summary>
+    private void FixSequence()
+    {
+        var employee = SelectedEmployee;
+        var period = SelectedPeriod;
+        if (employee is null || period is null) return;
+
+        if (!PromptDialog.Confirm(this,
+                $"Re-type this employee's punches so they alternate IN, OUT, IN, OUT for " +
+                $"{period.Start:MMM d} – {period.End:MMM d, yyyy}?\n\n" +
+                "Punches that are already in sequence are left alone; breaks and paid hours are not touched."))
+            return;
+
+        var changes = PunchSequence.Normalize(
+            Services.Store, employee.Id, period.Start, period.End.AddDays(1));
+
+        if (changes.Count == 0)
+        {
+            PromptDialog.Info(this, "Every day in this period already alternates IN and OUT. Nothing to fix.");
+            return;
+        }
+
+        Services.Store.Audit("Punch sequence fixed",
+            $"{employee.DisplayName} {period.Label}: " + string.Join("; ", changes.Select(c => c.Describe())));
+
+        _sequenceNote = Describe(changes);
+        Services.NotifyDataChanged();
+        LoadEmployee();
+    }
+
+    private static string Describe(List<PunchKindChange> changes) => changes.Count switch
+    {
+        0 => "",
+        1 => $"re-typed {changes[0].Describe()}",
+        _ => $"re-typed {changes.Count} punches: " + string.Join("; ", changes.Select(c => c.Describe())),
+    };
 
     private void AdjustTotals()
     {

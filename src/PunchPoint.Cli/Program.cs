@@ -4,6 +4,7 @@ using System.Text;
 using PunchPoint.Core.Import;
 using PunchPoint.Core.Jet;
 using PunchPoint.Core.Models;
+using PunchPoint.Core.TimeCalc;
 using PunchPoint.Core.Services;
 using PunchPoint.Core.Storage;
 using PunchPoint.Core.TimeCalc;
@@ -30,6 +31,7 @@ public static class Program
                 "timecards" => TimeCards(args[1..]),
                 "demo" => Demo(args[1..]),
                 "doctor" => Doctor(args[1..]),
+                "fix-sequence" => FixSequence(args[1..]),
                 "pdf" => Pdf(args[1..]),
                 "update" => Update(args[1..]),
                 "report" => Report(args[1..]),
@@ -87,6 +89,11 @@ public static class Program
 
             Reporting
               punchpoint pdf <out.pdf> [--db <file>] [--period <n>]   Hours summary as PDF
+
+            Repair
+              punchpoint fix-sequence [--db <file>] [--employee <pin>] [--from <date>] [--to <date>] [--apply]
+                Re-types punches that break the IN/OUT alternation (two INs or two OUTs in a day).
+                Dry run unless --apply is given.
 
             Verification
               punchpoint timecards [--db <file>] [--period <n>]   Print computed time cards
@@ -729,6 +736,85 @@ public static class Program
         Console.WriteLine(Maintenance.Describe(store));
         Console.WriteLine($"Backup:        {backup ?? "(already taken today)"}");
         Console.WriteLine($"Integrity:     {Maintenance.IntegrityCheck(store)}");
+        return 0;
+    }
+
+    private static int FixSequence(string[] args)
+    {
+        string? dbPath = null, employeeFilter = null;
+        DateTime? from = null, to = null;
+        bool apply = false;
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            switch (args[i])
+            {
+                case "--db": dbPath = args[++i]; break;
+                case "--employee": employeeFilter = args[++i]; break;
+                case "--from": from = DateTime.Parse(args[++i], CultureInfo.InvariantCulture); break;
+                case "--to": to = DateTime.Parse(args[++i], CultureInfo.InvariantCulture); break;
+                case "--apply": apply = true; break;
+            }
+        }
+
+        using var database = dbPath is null ? Database.OpenDefault() : Database.Open(dbPath);
+        var store = new Store(database);
+        var settings = store.GetSettings();
+
+        var employees = store.ListEmployees(includeInactive: true);
+        if (employeeFilter is not null)
+        {
+            var match = employees.FirstOrDefault(e => e.Pin == employeeFilter) ??
+                        employees.FirstOrDefault(e => e.Id.ToString() == employeeFilter);
+            if (match is null)
+            {
+                Console.Error.WriteLine($"No employee with PIN or id '{employeeFilter}'.");
+                return 1;
+            }
+            employees = new List<Employee> { match };
+        }
+
+        DateTime start = from ?? DateTime.Today.AddDays(-90);
+        DateTime end = (to ?? DateTime.Today).Date.AddDays(1);
+
+        int total = 0;
+        foreach (var employee in employees)
+        {
+            var punches = store
+                .ListPunches(employee.Id, start, end)
+                .Where(p => PunchSequence.IsClockPunch(p.Kind))
+                .ToList();
+            if (punches.Count == 0) continue;
+
+            var changes = new List<PunchKindChange>();
+            foreach (var day in punches
+                         .GroupBy(p => TimeCardCalculator.WorkDate(p.Timestamp, settings.DayChangeOffsetMinutes))
+                         .OrderBy(g => g.Key))
+            {
+                var (dayFrom, dayTo) = PunchSequence.WorkDay(
+                    day.Key.AddMinutes(settings.DayChangeOffsetMinutes), settings.DayChangeOffsetMinutes);
+                changes.AddRange(PunchSequence.Normalize(store, employee.Id, dayFrom, dayTo, save: apply));
+            }
+
+            if (changes.Count == 0) continue;
+            total += changes.Count;
+
+            Console.WriteLine($"{employee.SortName} (PIN {employee.Pin}): {changes.Count} punch(es) out of sequence");
+            foreach (var change in changes)
+                Console.WriteLine($"  {change.Timestamp:ddd yyyy-MM-dd}  {change.Describe()}");
+        }
+
+        if (total == 0)
+        {
+            Console.WriteLine("Every day alternates IN and OUT. Nothing to fix.");
+            return 0;
+        }
+
+        Console.WriteLine(apply
+            ? $"Re-typed {total} punch(es)."
+            : $"Would re-type {total} punch(es). Run again with --apply to write the changes.");
+
+        if (apply) store.Audit("Punch sequence fixed (command line)", $"{total} punch(es)");
         return 0;
     }
 

@@ -1,4 +1,5 @@
 using PunchPoint.Core.Models;
+using PunchPoint.Core.TimeCalc;
 
 namespace PunchPoint.App.UI;
 
@@ -19,6 +20,10 @@ public sealed class PunchEditDialog : EditorDialog
     private readonly Button _delete = Theme.DangerButton("Delete punch", 140);
 
     private PunchKind[] _kinds = Array.Empty<PunchKind>();
+    private readonly DateTime? _originalTimestamp;
+
+    /// <summary>Punches re-typed so the day alternates in/out, for the caller to report.</summary>
+    public List<PunchKindChange> SequenceChanges { get; private set; } = new();
 
     public PunchEditDialog(AppServices services, Employee employee, Punch? punch)
         : base(punch is null ? "Add punch" : "Edit punch",
@@ -27,6 +32,7 @@ public sealed class PunchEditDialog : EditorDialog
         _services = services;
         _employee = employee;
         _punch = punch;
+        _originalTimestamp = punch?.Timestamp;
 
         var grid = FormGrid();
         Body.Controls.Add(grid);
@@ -149,9 +155,33 @@ public sealed class PunchEditDialog : EditorDialog
                 $"{_employee.DisplayName}: {kind} {timestamp:g}");
         }
 
+        // Adding the missing half of a day leaves the other punch with the wrong direction.
+        // Straighten the day out now: in, out, in, out.
+        SequenceChanges = Normalize(ForDays(timestamp, _originalTimestamp));
+
         Saved = true;
         DialogResult = DialogResult.OK;
         Close();
+    }
+
+    private IEnumerable<DateTime> ForDays(params DateTime?[] moments)
+    {
+        var seen = new HashSet<DateTime>();
+        foreach (var moment in moments)
+        {
+            if (moment is null) continue;
+            var (from, _) = PunchSequence.WorkDay(moment.Value, _services.Settings.DayChangeOffsetMinutes);
+            if (seen.Add(from)) yield return moment.Value;
+        }
+    }
+
+    private List<PunchKindChange> Normalize(IEnumerable<DateTime> moments)
+    {
+        var changes = new List<PunchKindChange>();
+        foreach (var moment in moments)
+            changes.AddRange(PunchSequence.NormalizeAround(
+                _services.Store, _employee, moment, _services.Settings.DayChangeOffsetMinutes));
+        return changes;
     }
 
     private void DeletePunch()
@@ -162,6 +192,7 @@ public sealed class PunchEditDialog : EditorDialog
 
         _services.Store.DeletePunch(_punch.Id);
         _services.Store.Audit("Punch deleted", $"{_employee.DisplayName}: {_punch.Kind} {_punch.Timestamp:g}");
+        SequenceChanges = Normalize(ForDays(_punch.Timestamp, null));
         Saved = true;
         DialogResult = DialogResult.OK;
         Close();
