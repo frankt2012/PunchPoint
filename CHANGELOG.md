@@ -16,6 +16,9 @@ release, so a version stays a draft here until it has been tested on Windows.
 - If a supervisor used *Edit totals*, the footer says how much was added or removed, so the
   total always explains itself.
 - Long names shrink to fit the card instead of being cut off.
+- It is read-only (no supervisor password), and it closes itself after a minute so an employee
+  who walks away cannot leave their card open for the next person.
+- `PunchPointClock.exe --week <PIN>` opens the same view directly, which is handy for support.
 - **Kiosk mode:** the week view, the Supervisor menu and the password prompt now appear *above*
   the full-screen clock. They used to open behind it, so the screen looked frozen.
 
@@ -24,9 +27,6 @@ release, so a version stays a draft here until it has been tested on Windows.
 - Adding, editing or deleting a punch used to jump the screen back to the first employee in the
   list and the current period. It now stays on the employee and period you were working on.
 - Reports and Export keep their period (and Reports its employee filter) when the data refreshes.
-- It is read-only (no supervisor password), and it closes itself after a minute so an employee
-  who walks away cannot leave their card open for the next person.
-- `PunchPointClock.exe --week <PIN>` opens the same view directly, which is handy for support.
 
 ## 1.6.8 — 2026-11-26
 
