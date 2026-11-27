@@ -57,6 +57,7 @@ internal static class Program
 
             // Diagnostics: open at a fixed size, e.g. --size 640x480.
             string? layoutLog = ValueOf(args, "--layout-log");
+            string? weekPreview = ValueOf(args, "--week");
             Size? sizeOverride = null;
             string? sizeArg = ValueOf(args, "--size");
             if (sizeArg is not null)
@@ -101,7 +102,7 @@ internal static class Program
             });
             mailTimer.Start();
 
-            var kiosk = new KioskForm(store, fullScreen, sizeOverride);
+            var kiosk = new KioskForm(store, fullScreen, sizeOverride, weekPreview);
             if (layoutLog is not null) kiosk.EnableLayoutLog(layoutLog);
             Application.Run(kiosk);
             store.Audit("Clock closed", Environment.UserName);

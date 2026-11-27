@@ -55,6 +55,10 @@ End Break.
 
 The screen returns to the PIN pad by itself, so it can be left open all day.
 
+**Employees can check their own hours.** After typing their PIN, **My punches** shows the current
+pay period day by day — clock-in, clock-out, breaks, daily totals and the period total, plus
+whether the time card has been approved. It needs no supervisor and closes itself after a minute.
+
 ## Adding an employee
 
 Employees → **Add employee**.

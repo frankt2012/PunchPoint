@@ -4,6 +4,7 @@ using PunchPoint.App.UI;
 using PunchPoint.Core.Models;
 using PunchPoint.Core.Services;
 using PunchPoint.Core.Storage;
+using PunchPoint.Core.TimeCalc;
 
 namespace PunchPoint.Clock;
 
@@ -58,7 +59,7 @@ public sealed class KioskForm : Form
     private readonly bool _sizeFixed;
     private AppSettings _settings;
 
-    public KioskForm(Store store, bool fullScreen, Size? sizeOverride = null)
+    public KioskForm(Store store, bool fullScreen, Size? sizeOverride = null, string? weekPreviewPin = null)
     {
         _sizeFixed = sizeOverride is not null;
         _store = store;
@@ -104,7 +105,23 @@ public sealed class KioskForm : Form
 
         RefreshRecent();
         OnTick();
-        Shown += (_, _) => _pin.Focus();
+        Shown += (_, _) =>
+        {
+            _pin.Focus();
+
+            // Diagnostics: open one employee's week view straight away (used for screenshots
+            // and for showing a supervisor what an employee sees).
+            if (weekPreviewPin is null) return;
+
+            BeginInvoke(new Action(() =>
+            {
+                var employee = _store.FindByPin(weekPreviewPin) ?? _store.FindByBadge(weekPreviewPin);
+                if (employee is null) return;
+
+                ShowPerson(employee);
+                ShowMyPunches(employee);
+            }));
+        };
     }
 
     // -----------------------------------------------------------------
@@ -732,14 +749,63 @@ public sealed class KioskForm : Form
             _personButtons.Controls.Add(breakButton);
         }
 
-        var cancel = Theme.SecondaryButton("Not me", 340);
+        // "My punches" and "Not me" share one row so a compact window still fits.
+        var sideBySide = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            WrapContents = false,
+            AutoSize = true,
+            Margin = new Padding(0),
+            Padding = new Padding(0),
+        };
+
+        var mine = Theme.SecondaryButton("My punches", 165);
+        mine.Height = _compact ? 32 : 40;
+        mine.Margin = new Padding(0, 0, 6, 0);
+        mine.Click += (_, _) => ShowMyPunches(employee);
+        sideBySide.Controls.Add(mine);
+
+        var cancel = Theme.SecondaryButton("Not me", 165);
         cancel.Height = _compact ? 32 : 40;
+        cancel.Margin = new Padding(0);
         cancel.Click += (_, _) => Reset();
-        _personButtons.Controls.Add(cancel);
+        sideBySide.Controls.Add(cancel);
+
+        _personButtons.Controls.Add(sideBySide);
 
         _pinPanel.Visible = false;
         _personPanel.Visible = true;
         _personPanel.BringToFront();
+    }
+
+    /// <summary>
+    /// Shows this employee their own punches for the current pay period. The countdown is pushed
+    /// out while the dialog is open, then restarted, so the card does not reset underneath it.
+    /// </summary>
+    private void ShowMyPunches(Employee employee)
+    {
+        WeekSummary week;
+        try
+        {
+            week = EmployeeWeek.Build(_store, employee, _store.GetSettings());
+        }
+        catch (Exception ex)
+        {
+            PromptDialog.Warn(this, "Your punches could not be read: " + ex.Message);
+            return;
+        }
+
+        _resetAt = DateTime.Now.AddMinutes(5);
+        try
+        {
+            using var dialog = new WeekPunchesDialog(week, _store.GetSettings());
+            dialog.ShowDialog(this);
+        }
+        finally
+        {
+            _resetAt = DateTime.Now.AddSeconds(30);
+            if (_selected is not null) _pin.Focus();
+        }
     }
 
     private void PerformPunch(PunchKind kind)

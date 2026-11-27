@@ -3,6 +3,18 @@
 What changed in each release, in plain language. Update checks read the newest **published**
 release, so a version stays a draft here until it has been tested on Windows.
 
+## 1.6.9 — 2026-11-27
+
+**Employees can check their own punches.**
+
+- After entering their PIN, the clock shows a **My punches** button beside *Not me*. It opens
+  the current pay period for that employee: each day's first clock-in, last clock-out, break
+  time and daily total, the period total, and whether their time card has been approved.
+- A session still running shows **on the clock** instead of a clock-out time.
+- It is read-only (no supervisor password), and it closes itself after a minute so an employee
+  who walks away cannot leave their card open for the next person.
+- `PunchPointClock.exe --week <PIN>` opens the same view directly, which is handy for support.
+
 ## 1.6.8 — 2026-11-26
 
 **Punch direction repairs itself when a punch is added.**
