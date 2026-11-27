@@ -276,7 +276,11 @@ public sealed class KioskForm : Form
 
     private void SupervisorMenu()
     {
-        switch (SupervisorPrompt.Ask(this))
+        SupervisorAction choice;
+        using (new TopMostPause(this))
+            choice = SupervisorPrompt.Ask(this);
+
+        switch (choice)
         {
             case SupervisorAction.OpenApp:
                 OpenManagementApp();
@@ -714,6 +718,7 @@ public sealed class KioskForm : Form
         var status = _clock.GetStatus(employee);
 
         _personName.Text = employee.FullName;
+        FitPersonName();
         _personState.Text = status.StateLabel;
         _personState.ForeColor = status.IsClockedIn ? Theme.Success : Theme.TextMuted;
 
@@ -798,6 +803,7 @@ public sealed class KioskForm : Form
         _resetAt = DateTime.Now.AddMinutes(5);
         try
         {
+            using var topMost = new TopMostPause(this);
             using var dialog = new WeekPunchesDialog(week, _store.GetSettings());
             dialog.ShowDialog(this);
         }
@@ -806,6 +812,52 @@ public sealed class KioskForm : Form
             _resetAt = DateTime.Now.AddSeconds(30);
             if (_selected is not null) _pin.Focus();
         }
+    }
+
+    /// <summary>
+    /// Kiosk mode keeps the clock above every window, which also puts any dialog shown from it
+    /// *behind* itself — the screen does not appear to change. Drop TopMost for the duration of
+    /// the dialog and put it back afterwards.
+    /// </summary>
+    private sealed class TopMostPause : IDisposable
+    {
+        private readonly Form _form;
+        private readonly bool _wasTopMost;
+
+        public TopMostPause(Form form)
+        {
+            _form = form;
+            _wasTopMost = form.TopMost;
+            if (_wasTopMost) form.TopMost = false;
+        }
+
+        public void Dispose()
+        {
+            if (_wasTopMost) _form.TopMost = true;
+        }
+    }
+
+    /// <summary>
+    /// Long names must not be cut off: shrink the name until it fits one line of the card.
+    /// </summary>
+    private void FitPersonName()
+    {
+        if (_personPanel.ClientSize.Width < 60) return;
+
+        int padding = (_personStack as Control)?.Padding.Horizontal ?? 32;
+        int available = _personPanel.ClientSize.Width - padding - 4;
+        if (available < 60) return;
+
+        float size = _compact ? 19f : 24f;
+        while (size > 12f)
+        {
+            using var font = new Font(Theme.Family, size, FontStyle.Bold);
+            if (TextRenderer.MeasureText(_personName.Text, font).Width <= available) break;
+            size -= 1f;
+        }
+
+        if (Math.Abs(_personName.Font.Size - size) < 0.5f) return;
+        _personName.Font = new Font(Theme.Family, size, FontStyle.Bold);
     }
 
     private void PerformPunch(PunchKind kind)
@@ -943,6 +995,8 @@ public sealed class KioskForm : Form
 
     private void SupervisorExit()
     {
+        using var topMost = new TopMostPause(this);
+
         var settings = _store.GetSettings();
         string? hash = settings.AdminPasswordHash;
 

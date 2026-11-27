@@ -11,6 +11,13 @@ release, so a version stays a draft here until it has been tested on Windows.
   the current pay period for that employee: each day's first clock-in, last clock-out, break
   time and daily total, the period total, and whether their time card has been approved.
 - A session still running shows **on the clock** instead of a clock-out time.
+- Days that carry only paid hours say so (**Wed Nov 25 · holiday**), instead of showing an amount
+  with no times next to it.
+- If a supervisor used *Edit totals*, the footer says how much was added or removed, so the
+  total always explains itself.
+- Long names shrink to fit the card instead of being cut off.
+- **Kiosk mode:** the week view, the Supervisor menu and the password prompt now appear *above*
+  the full-screen clock. They used to open behind it, so the screen looked frozen.
 - It is read-only (no supervisor password), and it closes itself after a minute so an employee
   who walks away cannot leave their card open for the next person.
 - `PunchPointClock.exe --week <PIN>` opens the same view directly, which is handy for support.

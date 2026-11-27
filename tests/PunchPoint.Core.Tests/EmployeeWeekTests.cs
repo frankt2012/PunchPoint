@@ -120,6 +120,52 @@ public sealed class EmployeeWeekTests : IDisposable
     }
 
     [Fact]
+    public void A_day_with_only_paid_hours_is_labelled()
+    {
+        var period = Period();
+        var day = period.Start.Date.AddDays(2);
+
+        _store.InsertPunch(new Punch
+        {
+            EmployeeId = _employee.Id,
+            Timestamp = day,
+            Kind = PunchKind.Hours,
+            Hours = TimeSpan.FromHours(8),
+            HoursCategory = "Holiday",
+            Source = PunchSource.Import,
+            PayPeriodId = _store.GetPayPeriodFor(day)?.Id,
+        });
+
+        var week = EmployeeWeek.Build(_store, _employee, _store.GetSettings());
+
+        var row = Assert.Single(week.Days);
+        Assert.Null(row.FirstIn);
+        Assert.Null(row.LastOut);
+        Assert.Equal("Holiday", row.PaidLabel);
+        Assert.Equal(8 * 60, row.TotalMinutes);
+    }
+
+    [Fact]
+    public void A_supervisor_adjustment_is_reported_as_its_own_amount()
+    {
+        var period = Period();
+        var day = period.Start.Date;
+
+        Add(day.AddHours(8), PunchKind.In);
+        Add(day.AddHours(16), PunchKind.Out);
+
+        var card = _store.GetOrCreateTimeCard(_employee.Id, period.Id);
+        card.AdjustRegularMinutes = 30;
+        _store.SaveTimeCard(card);
+
+        var week = EmployeeWeek.Build(_store, _employee, _store.GetSettings());
+
+        Assert.Equal(30, week.AdjustmentMinutes);
+        Assert.Equal(8 * 60 + 30, week.TotalMinutes);
+        Assert.Equal(8 * 60, week.Days.Single().TotalMinutes);
+    }
+
+    [Fact]
     public void A_period_with_nothing_in_it_is_empty()
     {
         var week = EmployeeWeek.Build(_store, _employee, _store.GetSettings());

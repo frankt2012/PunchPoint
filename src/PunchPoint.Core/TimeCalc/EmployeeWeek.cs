@@ -13,7 +13,8 @@ public sealed record WeekDay(
     int WorkedMinutes,
     int TotalMinutes,
     bool IsOpen,
-    bool IsHoliday);
+    bool IsHoliday,
+    string? PaidLabel = null);
 
 /// <summary>An employee's own view of the current pay period.</summary>
 public sealed class WeekSummary
@@ -23,6 +24,9 @@ public sealed class WeekSummary
     public List<WeekDay> Days { get; } = new();
     public int TotalMinutes { get; set; }
     public int BreakMinutes { get; set; }
+
+    /// <summary>Minutes a supervisor added or removed with "Edit totals" for this period.</summary>
+    public int AdjustmentMinutes { get; set; }
     public bool Approved { get; set; }
     public int IssueCount { get; set; }
 
@@ -61,6 +65,7 @@ public static class EmployeeWeek
             Period = period,
             TotalMinutes = result.TotalMinutes,
             BreakMinutes = result.Days.Sum(d => d.BreakMinutes),
+            AdjustmentMinutes = result.AdjustmentMinutes,
             Approved = card?.Approved == true,
             IssueCount = result.Issues.Count,
         };
@@ -79,6 +84,20 @@ public static class EmployeeWeek
             foreach (var segment in day.Segments.Where(s => s.Out is not null).OrderBy(s => s.Out))
                 lastOut = segment.Out;
 
+            // A day that only carries paid hours (holiday, vacation, sick) should say so,
+            // otherwise it looks like a mistake with no times.
+            string? paidLabel = null;
+            if (!hasPunches)
+            {
+                var paid = punches
+                    .Where(p => p.Kind == PunchKind.Hours
+                                && TimeCardCalculator.WorkDate(p.Timestamp, settings.DayChangeOffsetMinutes) == day.WorkDate.Date)
+                    .ToList();
+
+                if (paid.Count > 0)
+                    paidLabel = paid[0].HoursCategory.Length > 0 ? paid[0].HoursCategory : "Paid hours";
+            }
+
             summary.Days.Add(new WeekDay(
                 day.WorkDate.Date,
                 firstIn,
@@ -87,7 +106,8 @@ public static class EmployeeWeek
                 day.WorkedMinutes,
                 day.TotalMinutes,
                 open,
-                day.IsHoliday));
+                day.IsHoliday,
+                paidLabel));
         }
 
         return summary;

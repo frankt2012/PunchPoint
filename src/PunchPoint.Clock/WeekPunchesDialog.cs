@@ -56,10 +56,14 @@ internal sealed class WeekPunchesDialog : Form
         var total = new Label
         {
             Text = week.IsEmpty
-                ? "No punches in this period yet."
+                ? ""
                 : $"Total this period: {hours}" +
                   (settings.TotalsFormat == TotalsFormat.Hundredths ? " hours" : "") +
-                  (week.BreakMinutes > 0 ? $"   ·   breaks {week.BreakMinutes} min" : ""),
+                  (week.BreakMinutes > 0 ? $"   ·   breaks {week.BreakMinutes} min" : "") +
+                  (week.AdjustmentMinutes != 0
+                      ? $"   ·   adjustment {(week.AdjustmentMinutes > 0 ? "+" : "−")}" +
+                        ReportBuilder.Hours(Math.Abs(week.AdjustmentMinutes), settings.TotalsFormat)
+                      : ""),
             Font = Theme.BodyBold,
             ForeColor = Theme.Text,
             AutoSize = true,
@@ -118,7 +122,9 @@ internal sealed class WeekPunchesDialog : Form
         {
             string label = day.IsHoliday
                 ? $"{day.Date:ddd MMM d} · holiday"
-                : day.Date.Date == DateTime.Today ? $"{day.Date:ddd MMM d} · today" : day.Date.ToString("ddd MMM d");
+                : day.PaidLabel is not null
+                    ? $"{day.Date:ddd MMM d} · {day.PaidLabel.ToLowerInvariant()}"
+                    : day.Date.Date == DateTime.Today ? $"{day.Date:ddd MMM d} · today" : day.Date.ToString("ddd MMM d");
 
             int index = grid.Rows.Add(
                 label,
