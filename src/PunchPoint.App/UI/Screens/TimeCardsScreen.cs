@@ -147,6 +147,11 @@ public sealed class TimeCardsScreen : ScreenBase
 
     public override void RefreshData()
     {
+        // Whatever the supervisor was looking at must survive a refresh: adding, editing or
+        // deleting a punch used to jump back to the first employee (and the current period).
+        int? keepEmployeeId = SelectedEmployee?.Id;
+        int? keepPeriodId = SelectedPeriod?.Id;
+
         bool first = _employees.Count == 0;
         _employees = Services.Store.ListEmployees(includeInactive: true);
         _periods = PeriodPickerList.Build(Services.Store, out var currentPeriod);
@@ -162,12 +167,26 @@ public sealed class TimeCardsScreen : ScreenBase
             foreach (var period in _periods)
                 _period.Items.Add(PayPeriodLabels.Label(period, _periods, currentPeriod?.Id));
 
-            int periodIndex = currentPeriod is null ? 0 : Math.Max(0, _periods.FindIndex(p => p.Id == currentPeriod.Id));
+            int periodIndex = keepPeriodId is int kept
+                ? _periods.FindIndex(p => p.Id == kept)
+                : -1;
+
+            if (periodIndex < 0)
+                periodIndex = currentPeriod is null ? 0 : Math.Max(0, _periods.FindIndex(p => p.Id == currentPeriod.Id));
+
             if (_periods.Count > 0) _period.SelectedIndex = periodIndex;
 
-            if (_employee.Items.Count > 0 && (first || _employee.SelectedIndex < 0))
+            var ordered = _employees.OrderBy(e => e.SortName).ToList();
+            int keptIndex = keepEmployeeId is int employeeId
+                ? ordered.FindIndex(e => e.Id == employeeId)
+                : -1;
+
+            if (keptIndex >= 0)
             {
-                var ordered = _employees.OrderBy(e => e.SortName).ToList();
+                _employee.SelectedIndex = keptIndex;
+            }
+            else if (_employee.Items.Count > 0 && (first || _employee.SelectedIndex < 0))
+            {
                 int index = -1;
 
                 // Prefer someone who actually has punches in this period.

@@ -104,10 +104,14 @@ public sealed class ExportScreen : ScreenBase
 
     public override void RefreshData()
     {
+        int? keepPeriodId = Period?.Id;
+
         _periodsLoaded = PeriodPickerList.Build(Services.Store, out var currentPeriod);
         _employees = Services.Store.ListEmployees(includeInactive: true);
 
-        int index = currentPeriod is null ? 0 : Math.Max(0, _periodsLoaded.FindIndex(p => p.Id == currentPeriod.Id));
+        int index = keepPeriodId is int kept ? _periodsLoaded.FindIndex(p => p.Id == kept) : -1;
+        if (index < 0)
+            index = currentPeriod is null ? 0 : Math.Max(0, _periodsLoaded.FindIndex(p => p.Id == currentPeriod.Id));
 
         _periods.Items.Clear();
         foreach (var period in _periodsLoaded)

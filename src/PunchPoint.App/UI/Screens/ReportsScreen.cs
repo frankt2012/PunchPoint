@@ -112,10 +112,17 @@ public sealed class ReportsScreen : ScreenBase
 
     public override void RefreshData()
     {
+        // Keep the report the supervisor chose: a refresh must not drop back to the current
+        // period and "All employees".
+        int? keepPeriodId = Period?.Id;
+        int? keepEmployeeId = FilterEmployee?.Id;
+
         _loadedPeriods = PeriodPickerList.Build(Services.Store, out var currentPeriod);
         _employees = Services.Store.ListEmployees(includeInactive: true).OrderBy(e => e.SortName).ToList();
 
-        int periodIndex = currentPeriod is null ? 0 : Math.Max(0, _loadedPeriods.FindIndex(p => p.Id == currentPeriod.Id));
+        int periodIndex = keepPeriodId is int kept ? _loadedPeriods.FindIndex(p => p.Id == kept) : -1;
+        if (periodIndex < 0)
+            periodIndex = currentPeriod is null ? 0 : Math.Max(0, _loadedPeriods.FindIndex(p => p.Id == currentPeriod.Id));
 
         _periods.Items.Clear();
         foreach (var period in _loadedPeriods)
@@ -126,7 +133,14 @@ public sealed class ReportsScreen : ScreenBase
         foreach (var employee in _employees) _employeeFilter.Items.Add(employee.SortName);
 
         if (_loadedPeriods.Count > 0) _periods.SelectedIndex = periodIndex;
-        if (_employeeFilter.Items.Count > 0) _employeeFilter.SelectedIndex = 0;
+
+        int filterIndex = 0;
+        if (keepEmployeeId is int employeeId)
+        {
+            int at = _employees.FindIndex(e => e.Id == employeeId);
+            if (at >= 0) filterIndex = at + 1;
+        }
+        if (_employeeFilter.Items.Count > 0) _employeeFilter.SelectedIndex = filterIndex;
 
         Build();
     }
